@@ -90,27 +90,40 @@ export const DecisionTreeCanvas = ({
             let endX = toCenterX;
             let endY = toCenterY;
 
-            if (fromCenterX < toCenterX) {
-              startX = fromNode.position.x + nodeWidth;
-              endX = toNode.position.x;
-            } else if (fromCenterX > toCenterX) {
-              startX = fromNode.position.x;
-              endX = toNode.position.x + nodeWidth;
-            }
+            const deltaX = toCenterX - fromCenterX;
+            const deltaY = toCenterY - fromCenterY;
 
-            if (fromCenterY < toCenterY) {
-              startY = fromNode.position.y + nodeHeight;
-              endY = toNode.position.y;
-            } else if (fromCenterY > toCenterY) {
-              startY = fromNode.position.y;
-              endY = toNode.position.y + nodeHeight;
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+              if (deltaX > 0) {
+                startX = fromNode.position.x + nodeWidth;
+                startY = fromNode.position.y + nodeHeight / 2;
+                endX = toNode.position.x;
+                endY = toNode.position.y + nodeHeight / 2;
+              } else {
+                startX = fromNode.position.x;
+                startY = fromNode.position.y + nodeHeight / 2;
+                endX = toNode.position.x + nodeWidth;
+                endY = toNode.position.y + nodeHeight / 2;
+              }
+            } else {
+              if (deltaY > 0) {
+                startX = fromNode.position.x + nodeWidth / 2;
+                startY = fromNode.position.y + nodeHeight;
+                endX = toNode.position.x + nodeWidth / 2;
+                endY = toNode.position.y;
+              } else {
+                startX = fromNode.position.x + nodeWidth / 2;
+                startY = fromNode.position.y;
+                endX = toNode.position.x + nodeWidth / 2;
+                endY = toNode.position.y + nodeHeight;
+              }
             }
 
             const midX = (startX + endX) / 2;
             const midY = (startY + endY) / 2;
 
             let path = '';
-            if (Math.abs(fromCenterX - toCenterX) > Math.abs(fromCenterY - toCenterY)) {
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
               if (startY === endY) {
                 path = `M ${startX} ${startY} L ${endX} ${endY}`;
               } else if (startY < endY) {
@@ -129,7 +142,9 @@ export const DecisionTreeCanvas = ({
                         L ${endX} ${endY}`;
               }
             } else {
-              if (startX < endX) {
+              if (startX === endX) {
+                path = `M ${startX} ${startY} L ${endX} ${endY}`;
+              } else if (startX < endX) {
                 path = `M ${startX} ${startY} 
                         L ${startX} ${midY - radius} 
                         Q ${startX} ${midY} ${startX + radius} ${midY}
