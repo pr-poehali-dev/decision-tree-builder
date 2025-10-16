@@ -67,6 +67,7 @@ const Index = () => {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [nodes, setNodes] = useState<DecisionNode[]>([
     {
@@ -288,6 +289,68 @@ const Index = () => {
     return connections;
   };
 
+  const handleExportJSON = () => {
+    const data = {
+      version: '1.0',
+      createdAt: new Date().toISOString(),
+      template: selectedTemplate,
+      nodes: nodes
+    };
+
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `decision-tree-${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({ title: 'Decision tree exported successfully' });
+  };
+
+  const handleImportJSON = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const data = JSON.parse(content);
+
+        if (!data.nodes || !Array.isArray(data.nodes)) {
+          throw new Error('Invalid JSON format');
+        }
+
+        setNodes(data.nodes);
+        if (data.template) {
+          setSelectedTemplate(data.template);
+        }
+        setSelectedNode(null);
+
+        toast({ title: 'Decision tree imported successfully' });
+      } catch (error) {
+        toast({
+          title: 'Import failed',
+          description: 'Invalid JSON file format',
+          variant: 'destructive'
+        });
+      }
+    };
+    reader.readAsText(file);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
   return (
     <div className="flex h-screen bg-background font-inter">
       <aside
@@ -391,14 +454,25 @@ const Index = () => {
             </h2>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={triggerFileInput}>
+              <Icon name="Upload" size={16} className="mr-2" />
+              Import JSON
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleExportJSON}>
+              <Icon name="Download" size={16} className="mr-2" />
+              Export JSON
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => setNodes([])}>
               <Icon name="RotateCcw" size={16} className="mr-2" />
               Clear All
             </Button>
-            <Button variant="ghost" size="sm">
-              <Icon name="Download" size={16} className="mr-2" />
-              Export
-            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleImportJSON}
+              className="hidden"
+            />
           </div>
         </header>
 
