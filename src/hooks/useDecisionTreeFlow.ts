@@ -62,7 +62,11 @@ const convertToReactFlowEdges = (decisionNodes: DecisionNode[]): Edge[] => {
           id: `${node.id}-${toId}`,
           source: node.id,
           target: toId,
-          type: 'smoothstep'
+          type: 'smoothstep',
+          markerEnd: {
+            type: 'arrowclosed',
+            color: '#94a3b8'
+          }
         });
       });
     }
@@ -74,7 +78,11 @@ const convertToReactFlowEdges = (decisionNodes: DecisionNode[]): Edge[] => {
           source: node.id,
           sourceHandle: oc.optionId,
           target: oc.targetNodeId,
-          type: 'smoothstep'
+          type: 'smoothstep',
+          markerEnd: {
+            type: 'arrowclosed',
+            color: '#94a3b8'
+          }
         });
       });
     }

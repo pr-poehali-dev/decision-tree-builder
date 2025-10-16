@@ -168,7 +168,13 @@ const Index = () => {
             defaultEdgeOptions={{
               type: 'smoothstep',
               animated: false,
-              style: { stroke: '#94a3b8', strokeWidth: 2 }
+              style: { stroke: '#94a3b8', strokeWidth: 2 },
+              markerEnd: {
+                type: 'arrowclosed',
+                color: '#94a3b8',
+                width: 20,
+                height: 20
+              }
             }}
           >
             <Background />
