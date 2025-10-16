@@ -71,22 +71,66 @@ export const DecisionTreeCanvas = ({
 
             if (!fromNode || !toNode) return null;
 
-            const fromX = fromNode.position.x + 280;
-            const fromY = fromNode.position.y + 75;
-            const toX = toNode.position.x;
-            const toY = toNode.position.y + 75;
+            const nodeWidth = 280;
+            const nodeHeight = 150;
+
+            const fromCenterX = fromNode.position.x + nodeWidth / 2;
+            const fromCenterY = fromNode.position.y + nodeHeight / 2;
+            const toCenterX = toNode.position.x + nodeWidth / 2;
+            const toCenterY = toNode.position.y + nodeHeight / 2;
 
             const isActive = selectedNode === conn.from || selectedNode === conn.to;
+            const strokeColor = isActive ? '#0ea5e9' : '#94a3b8';
+            const strokeWidth = isActive ? '3' : '2';
+
+            const radius = 20;
+            const midX = (fromCenterX + toCenterX) / 2;
+
+            let path = '';
+            if (Math.abs(fromCenterX - toCenterX) > Math.abs(fromCenterY - toCenterY)) {
+              if (fromCenterY === toCenterY) {
+                path = `M ${fromCenterX} ${fromCenterY} L ${toCenterX} ${toCenterY}`;
+              } else if (fromCenterY < toCenterY) {
+                path = `M ${fromCenterX} ${fromCenterY} 
+                        L ${midX - radius} ${fromCenterY} 
+                        Q ${midX} ${fromCenterY} ${midX} ${fromCenterY + radius}
+                        L ${midX} ${toCenterY - radius}
+                        Q ${midX} ${toCenterY} ${midX + radius} ${toCenterY}
+                        L ${toCenterX} ${toCenterY}`;
+              } else {
+                path = `M ${fromCenterX} ${fromCenterY} 
+                        L ${midX - radius} ${fromCenterY} 
+                        Q ${midX} ${fromCenterY} ${midX} ${fromCenterY - radius}
+                        L ${midX} ${toCenterY + radius}
+                        Q ${midX} ${toCenterY} ${midX + radius} ${toCenterY}
+                        L ${toCenterX} ${toCenterY}`;
+              }
+            } else {
+              const midY = (fromCenterY + toCenterY) / 2;
+              if (fromCenterX < toCenterX) {
+                path = `M ${fromCenterX} ${fromCenterY} 
+                        L ${fromCenterX} ${midY - radius} 
+                        Q ${fromCenterX} ${midY} ${fromCenterX + radius} ${midY}
+                        L ${toCenterX - radius} ${midY}
+                        Q ${toCenterX} ${midY} ${toCenterX} ${midY + radius}
+                        L ${toCenterX} ${toCenterY}`;
+              } else {
+                path = `M ${fromCenterX} ${fromCenterY} 
+                        L ${fromCenterX} ${midY - radius} 
+                        Q ${fromCenterX} ${midY} ${fromCenterX - radius} ${midY}
+                        L ${toCenterX + radius} ${midY}
+                        Q ${toCenterX} ${midY} ${toCenterX} ${midY + radius}
+                        L ${toCenterX} ${toCenterY}`;
+              }
+            }
 
             return (
-              <line
+              <path
                 key={idx}
-                x1={fromX}
-                y1={fromY}
-                x2={toX}
-                y2={toY}
-                stroke={isActive ? '#0ea5e9' : '#94a3b8'}
-                strokeWidth={isActive ? '3' : '2'}
+                d={path}
+                stroke={strokeColor}
+                strokeWidth={strokeWidth}
+                fill="none"
                 markerEnd={isActive ? 'url(#arrowhead-active)' : 'url(#arrowhead)'}
               />
             );
@@ -107,7 +151,7 @@ export const DecisionTreeCanvas = ({
           >
             <Card
               className={cn(
-                'w-[280px] transition-all duration-200 hover:shadow-lg',
+                'w-[280px] transition-all duration-200 hover:shadow-lg border-2',
                 selectedNode === node.id
                   ? 'ring-2 ring-primary shadow-lg'
                   : connectingFrom === node.id
