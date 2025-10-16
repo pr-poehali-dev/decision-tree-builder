@@ -1,6 +1,7 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { DecisionNode, NodeOption, Connection, NodeType } from '@/types/decision-tree';
+import { DecisionNode, NodeOption, NodeType } from '@/types/decision-tree';
+import { Node, Edge, Connection, addEdge, useNodesState, useEdgesState } from 'reactflow';
 import ELK from 'elkjs/lib/elk.bundled.js';
 
 const DEFAULT_NODES: DecisionNode[] = [
@@ -42,11 +43,50 @@ const DEFAULT_NODES: DecisionNode[] = [
   }
 ];
 
-export const useDecisionTree = () => {
+const convertToReactFlowNodes = (decisionNodes: DecisionNode[]): Node[] => {
+  return decisionNodes.map(node => ({
+    id: node.id,
+    type: 'custom',
+    position: node.position,
+    data: node
+  }));
+};
+
+const convertToReactFlowEdges = (decisionNodes: DecisionNode[]): Edge[] => {
+  const edges: Edge[] = [];
+  
+  decisionNodes.forEach(node => {
+    if (node.connections && Array.isArray(node.connections)) {
+      node.connections.forEach(toId => {
+        edges.push({
+          id: `${node.id}-${toId}`,
+          source: node.id,
+          target: toId,
+          type: 'smoothstep'
+        });
+      });
+    }
+    
+    if (node.optionConnections && Array.isArray(node.optionConnections)) {
+      node.optionConnections.forEach(oc => {
+        edges.push({
+          id: `${node.id}-${oc.optionId}-${oc.targetNodeId}`,
+          source: node.id,
+          target: oc.targetNodeId,
+          type: 'smoothstep'
+        });
+      });
+    }
+  });
+  
+  return edges;
+};
+
+export const useDecisionTreeFlow = () => {
   const { toast } = useToast();
   const autoLayoutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [nodes, setNodes] = useState<DecisionNode[]>(() => {
+  const [decisionNodes, setDecisionNodes] = useState<DecisionNode[]>(() => {
     const saved = localStorage.getItem('decisionTreeNodes');
     if (saved) {
       try {
@@ -58,13 +98,13 @@ export const useDecisionTree = () => {
     return DEFAULT_NODES;
   });
 
+  const [nodes, setNodes, onNodesChange] = useNodesState(convertToReactFlowNodes(decisionNodes));
+  const [edges, setEdges, onEdgesChange] = useEdgesState(convertToReactFlowEdges(decisionNodes));
+
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [editingNode, setEditingNode] = useState<DecisionNode | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAddNodeDialogOpen, setIsAddNodeDialogOpen] = useState(false);
-  const [draggedNode, setDraggedNode] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
   const [isAutoLayouting, setIsAutoLayouting] = useState(false);
 
   const [newNode, setNewNode] = useState<Partial<DecisionNode>>({
@@ -80,7 +120,7 @@ export const useDecisionTree = () => {
       clearTimeout(autoLayoutTimeoutRef.current);
     }
     autoLayoutTimeoutRef.current = setTimeout(() => {
-      localStorage.setItem('decisionTreeNodes', JSON.stringify(nodes));
+      localStorage.setItem('decisionTreeNodes', JSON.stringify(decisionNodes));
     }, 500);
 
     return () => {
@@ -88,7 +128,40 @@ export const useDecisionTree = () => {
         clearTimeout(autoLayoutTimeoutRef.current);
       }
     };
-  }, [nodes]);
+  }, [decisionNodes]);
+
+  useEffect(() => {
+    setNodes(convertToReactFlowNodes(decisionNodes));
+    setEdges(convertToReactFlowEdges(decisionNodes));
+  }, [decisionNodes, setNodes, setEdges]);
+
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      setEdges((eds) => addEdge({ ...connection, type: 'smoothstep' }, eds));
+      
+      if (connection.source && connection.target) {
+        setDecisionNodes(prev => prev.map(node => {
+          if (node.id === connection.source) {
+            return {
+              ...node,
+              connections: [...(node.connections || []), connection.target]
+            };
+          }
+          return node;
+        }));
+      }
+    },
+    [setEdges]
+  );
+
+  const onNodeDragStop = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      setDecisionNodes(prev => prev.map(dn => 
+        dn.id === node.id ? { ...dn, position: node.position } : dn
+      ));
+    },
+    []
+  );
 
   const handleEditNode = (node: DecisionNode) => {
     setEditingNode({ ...node });
@@ -98,7 +171,7 @@ export const useDecisionTree = () => {
   const handleSaveNode = () => {
     if (!editingNode) return;
 
-    setNodes(prev => prev.map(node =>
+    setDecisionNodes(prev => prev.map(node =>
       node.id === editingNode.id ? editingNode : node
     ));
     setIsEditDialogOpen(false);
@@ -106,7 +179,7 @@ export const useDecisionTree = () => {
   };
 
   const handleDeleteNode = (nodeId: string) => {
-    setNodes(prev => prev.filter(n => n.id !== nodeId).map(node => ({
+    setDecisionNodes(prev => prev.filter(n => n.id !== nodeId).map(node => ({
       ...node,
       connections: (node.connections || []).filter(c => c !== nodeId),
       optionConnections: (node.optionConnections || []).filter(oc => oc.targetNodeId !== nodeId)
@@ -133,30 +206,15 @@ export const useDecisionTree = () => {
       position: { x: 400, y: 300 }
     };
 
-    setNodes(prev => [...prev, node]);
+    setDecisionNodes(prev => [...prev, node]);
     setIsAddNodeDialogOpen(false);
     setNewNode({ type: 'single', title: '', description: '', options: [], optionConnections: [] });
     toast({ title: 'Node created successfully' });
     setTimeout(() => handleAutoLayout(), 100);
   };
 
-  const handleToggleConnection = (fromId: string, toId: string) => {
-    setNodes(prev => prev.map(node => {
-      if (node.id === fromId) {
-        const hasConnection = node.connections.includes(toId);
-        return {
-          ...node,
-          connections: hasConnection
-            ? node.connections.filter(c => c !== toId)
-            : [...node.connections, toId]
-        };
-      }
-      return node;
-    }));
-  };
-
   const handleConnectOption = (nodeId: string, optionId: string, targetNodeId: string) => {
-    setNodes(prev => prev.map(node => {
+    setDecisionNodes(prev => prev.map(node => {
       if (node.id === nodeId) {
         const optionConnections = node.optionConnections || [];
         const existingConnection = optionConnections.find(oc => oc.optionId === optionId);
@@ -179,7 +237,7 @@ export const useDecisionTree = () => {
   };
 
   const handleRemoveOptionConnection = (nodeId: string, optionId: string) => {
-    setNodes(prev => prev.map(node => {
+    setDecisionNodes(prev => prev.map(node => {
       if (node.id === nodeId) {
         return {
           ...node,
@@ -188,19 +246,6 @@ export const useDecisionTree = () => {
       }
       return node;
     }));
-  };
-
-  const handleStartConnection = (nodeId: string) => {
-    setConnectingFrom(nodeId);
-    toast({ title: 'Click on another node to connect' });
-  };
-
-  const handleCompleteConnection = (toNodeId: string) => {
-    if (connectingFrom && connectingFrom !== toNodeId) {
-      handleToggleConnection(connectingFrom, toNodeId);
-      toast({ title: 'Connection created' });
-    }
-    setConnectingFrom(null);
   };
 
   const addOptionToEditingNode = () => {
@@ -235,35 +280,40 @@ export const useDecisionTree = () => {
   };
 
   const getTargetNodeForOption = (nodeId: string, optionId: string): string | null => {
-    const node = nodes.find(n => n.id === nodeId);
+    const node = decisionNodes.find(n => n.id === nodeId);
     if (!node || !node.optionConnections) return null;
     const connection = node.optionConnections.find(oc => oc.optionId === optionId);
     return connection?.targetNodeId || null;
   };
 
-  const getConnections = (): Connection[] => {
-    const connections: Connection[] = [];
-    nodes.forEach(node => {
-      if (node.connections && Array.isArray(node.connections)) {
-        node.connections.forEach(toId => {
-          connections.push({ from: node.id, to: toId });
-        });
-      }
-      if (node.optionConnections && Array.isArray(node.optionConnections)) {
-        node.optionConnections.forEach(oc => {
-          connections.push({ from: node.id, to: oc.targetNodeId });
-        });
-      }
-    });
-    return connections;
-  };
-
   const handleAutoLayout = async () => {
-    if (nodes.length === 0 || isAutoLayouting) return;
+    if (decisionNodes.length === 0 || isAutoLayouting) return;
     
     setIsAutoLayouting(true);
     try {
       const elk = new ELK();
+      
+      const allEdges: { id: string; sources: string[]; targets: string[] }[] = [];
+      decisionNodes.forEach(node => {
+        if (node.connections && Array.isArray(node.connections)) {
+          node.connections.forEach(toId => {
+            allEdges.push({
+              id: `${node.id}-${toId}`,
+              sources: [node.id],
+              targets: [toId]
+            });
+          });
+        }
+        if (node.optionConnections && Array.isArray(node.optionConnections)) {
+          node.optionConnections.forEach(oc => {
+            allEdges.push({
+              id: `${node.id}-${oc.optionId}-${oc.targetNodeId}`,
+              sources: [node.id],
+              targets: [oc.targetNodeId]
+            });
+          });
+        }
+      });
       
       const graph = {
         id: 'root',
@@ -274,21 +324,17 @@ export const useDecisionTree = () => {
           'elk.layered.spacing.nodeNodeBetweenLayers': '100',
           'elk.spacing.edgeNode': '40'
         },
-        children: nodes.map(node => ({
+        children: decisionNodes.map(node => ({
           id: node.id,
           width: 320,
           height: 150 + (node.options?.length || 0) * 30
         })),
-        edges: getConnections().map((conn, idx) => ({
-          id: `edge-${idx}`,
-          sources: [conn.from],
-          targets: [conn.to]
-        }))
+        edges: allEdges
       };
 
       const layout = await elk.layout(graph);
       
-      setNodes(prev => prev.map(node => {
+      setDecisionNodes(prev => prev.map(node => {
         const elkNode = layout.children?.find(n => n.id === node.id);
         if (elkNode && elkNode.x !== undefined && elkNode.y !== undefined) {
           return {
@@ -310,7 +356,13 @@ export const useDecisionTree = () => {
 
   return {
     nodes,
-    setNodes,
+    edges,
+    decisionNodes,
+    setDecisionNodes,
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    onNodeDragStop,
     selectedNode,
     setSelectedNode,
     editingNode,
@@ -319,12 +371,6 @@ export const useDecisionTree = () => {
     setIsEditDialogOpen,
     isAddNodeDialogOpen,
     setIsAddNodeDialogOpen,
-    draggedNode,
-    setDraggedNode,
-    dragOffset,
-    setDragOffset,
-    connectingFrom,
-    setConnectingFrom,
     isAutoLayouting,
     newNode,
     setNewNode,
@@ -332,16 +378,12 @@ export const useDecisionTree = () => {
     handleSaveNode,
     handleDeleteNode,
     handleAddNode,
-    handleToggleConnection,
     handleConnectOption,
     handleRemoveOptionConnection,
-    handleStartConnection,
-    handleCompleteConnection,
     addOptionToEditingNode,
     removeOptionFromEditingNode,
     updateOptionInEditingNode,
     getTargetNodeForOption,
-    getConnections,
     handleAutoLayout
   };
 };

@@ -1,11 +1,13 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useMemo } from 'react';
+import ReactFlow, { Background, Controls, MiniMap } from 'reactflow';
+import 'reactflow/dist/style.css';
 import { useToast } from '@/hooks/use-toast';
-import { useDecisionTree } from '@/hooks/useDecisionTree';
+import { useDecisionTreeFlow } from '@/hooks/useDecisionTreeFlow';
 import { DecisionTreeSidebar } from '@/components/decision-tree/DecisionTreeSidebar';
 import { DecisionTreeHeader } from '@/components/decision-tree/DecisionTreeHeader';
-import { DecisionTreeCanvas } from '@/components/decision-tree/DecisionTreeCanvas';
 import { NodeEditDialog } from '@/components/decision-tree/NodeEditDialog';
 import { AddNodeDialog } from '@/components/decision-tree/AddNodeDialog';
+import { CustomNode } from '@/components/decision-tree/CustomNode';
 
 const sampleTemplates = [
   {
@@ -19,12 +21,17 @@ const Index = () => {
   const { toast } = useToast();
   const [selectedTemplate, setSelectedTemplate] = useState<string>('sample-tree');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     nodes,
-    setNodes,
+    edges,
+    decisionNodes,
+    setDecisionNodes,
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    onNodeDragStop,
     selectedNode,
     setSelectedNode,
     editingNode,
@@ -33,11 +40,6 @@ const Index = () => {
     setIsEditDialogOpen,
     isAddNodeDialogOpen,
     setIsAddNodeDialogOpen,
-    draggedNode,
-    setDraggedNode,
-    dragOffset,
-    setDragOffset,
-    connectingFrom,
     isAutoLayouting,
     newNode,
     setNewNode,
@@ -47,62 +49,21 @@ const Index = () => {
     handleAddNode,
     handleConnectOption,
     handleRemoveOptionConnection,
-    handleStartConnection,
-    handleCompleteConnection,
     addOptionToEditingNode,
     removeOptionFromEditingNode,
     updateOptionInEditingNode,
     getTargetNodeForOption,
-    getConnections,
     handleAutoLayout
-  } = useDecisionTree();
+  } = useDecisionTreeFlow();
 
-  const handleNodeDragStart = (e: React.MouseEvent, nodeId: string) => {
-    if ((e.target as HTMLElement).closest('input, button, label')) return;
-    
-    const node = nodes.find(n => n.id === nodeId);
-    if (!node) return;
-
-    setDraggedNode(nodeId);
-    setDragOffset({
-      x: e.clientX - node.position.x,
-      y: e.clientY - node.position.y
-    });
-  };
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!draggedNode || !canvasRef.current) return;
-
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left - dragOffset.x;
-    const y = e.clientY - rect.top - dragOffset.y;
-
-    setNodes(prev => prev.map(node =>
-      node.id === draggedNode
-        ? { ...node, position: { x: Math.max(0, x), y: Math.max(0, y) } }
-        : node
-    ));
-  }, [draggedNode, dragOffset, setNodes]);
-
-  const handleMouseUp = useCallback(() => {
-    setDraggedNode(null);
-  }, [setDraggedNode]);
-
-  useEffect(() => {
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [handleMouseMove, handleMouseUp]);
+  const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
 
   const handleExportJSON = () => {
     const data = {
       version: '1.0',
       createdAt: new Date().toISOString(),
       template: selectedTemplate,
-      nodes: nodes
+      nodes: decisionNodes
     };
 
     const json = JSON.stringify(data, null, 2);
@@ -127,7 +88,7 @@ const Index = () => {
       try {
         const data = JSON.parse(event.target?.result as string);
         if (data.nodes && Array.isArray(data.nodes)) {
-          setNodes(data.nodes);
+          setDecisionNodes(data.nodes);
           if (data.template) {
             setSelectedTemplate(data.template);
           }
@@ -148,9 +109,17 @@ const Index = () => {
   };
 
   const handleClearAll = () => {
-    setNodes([]);
+    setDecisionNodes([]);
     localStorage.removeItem('decisionTreeNodes');
     toast({ title: 'All nodes cleared' });
+  };
+
+  const onSelectionChange = ({ nodes: selectedNodes }: { nodes: any[] }) => {
+    if (selectedNodes.length > 0) {
+      setSelectedNode(selectedNodes[0].id);
+    } else {
+      setSelectedNode(null);
+    }
   };
 
   return (
@@ -164,10 +133,12 @@ const Index = () => {
         onSelectTemplate={setSelectedTemplate}
         onAddNode={() => setIsAddNodeDialogOpen(true)}
         onEditNode={() => {
-          const node = nodes.find(n => n.id === selectedNode);
+          const node = decisionNodes.find(n => n.id === selectedNode);
           if (node) handleEditNode(node);
         }}
-        onStartConnection={() => selectedNode && handleStartConnection(selectedNode)}
+        onStartConnection={() => {
+          toast({ title: 'Connect nodes by dragging from one handle to another' });
+        }}
         onDeleteNode={() => selectedNode && handleDeleteNode(selectedNode)}
       />
 
@@ -182,24 +153,34 @@ const Index = () => {
           onTriggerFileInput={triggerFileInput}
         />
 
-        <DecisionTreeCanvas
-          nodes={nodes}
-          connections={getConnections()}
-          selectedNode={selectedNode}
-          draggedNode={draggedNode}
-          connectingFrom={connectingFrom}
-          canvasRef={canvasRef}
-          onNodeDragStart={handleNodeDragStart}
-          onNodeClick={setSelectedNode}
-          onCompleteConnection={handleCompleteConnection}
-          getTargetNodeForOption={getTargetNodeForOption}
-        />
+        <div className="flex-1">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeDragStop={onNodeDragStop}
+            onSelectionChange={onSelectionChange}
+            nodeTypes={nodeTypes}
+            fitView
+            defaultEdgeOptions={{
+              type: 'smoothstep',
+              animated: false,
+              style: { stroke: '#94a3b8', strokeWidth: 2 }
+            }}
+          >
+            <Background />
+            <Controls />
+            <MiniMap />
+          </ReactFlow>
+        </div>
       </main>
 
       <NodeEditDialog
         isOpen={isEditDialogOpen}
         editingNode={editingNode}
-        nodes={nodes}
+        nodes={decisionNodes}
         onClose={() => setIsEditDialogOpen(false)}
         onSave={handleSaveNode}
         onUpdateNode={(updates) => setEditingNode(editingNode ? { ...editingNode, ...updates } : null)}
