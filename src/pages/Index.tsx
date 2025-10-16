@@ -59,7 +59,16 @@ const Index = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [nodes, setNodes] = useState<DecisionNode[]>([
+  const [nodes, setNodes] = useState<DecisionNode[]>(() => {
+    const saved = localStorage.getItem('decisionTreeNodes');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return [];
+      }
+    }
+    return [
     {
       id: 'node-1',
       type: 'start',
@@ -113,8 +122,8 @@ const Index = () => {
       options: [{ id: 'opt-11', label: 'Observe', type: 'radio' }],
       connections: [],
       position: { x: 950, y: 250 }
-    }
-  ]);
+    }];
+  });
 
   const [newNode, setNewNode] = useState<Partial<DecisionNode>>({
     type: 'decision',
@@ -162,6 +171,10 @@ const Index = () => {
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [handleMouseMove, handleMouseUp]);
+
+  useEffect(() => {
+    localStorage.setItem('decisionTreeNodes', JSON.stringify(nodes));
+  }, [nodes]);
 
   const handleEditNode = (node: DecisionNode) => {
     setEditingNode({ ...node });
@@ -316,6 +329,7 @@ const Index = () => {
         }
 
         setNodes(data.nodes);
+        localStorage.setItem('decisionTreeNodes', JSON.stringify(data.nodes));
         if (data.template) {
           setSelectedTemplate(data.template);
         }
@@ -454,7 +468,15 @@ const Index = () => {
               <Icon name="Download" size={16} className="mr-2" />
               Export JSON
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setNodes([])}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => {
+                setNodes([]);
+                localStorage.removeItem('decisionTreeNodes');
+                toast({ title: 'All nodes cleared' });
+              }}
+            >
               <Icon name="RotateCcw" size={16} className="mr-2" />
               Clear All
             </Button>
