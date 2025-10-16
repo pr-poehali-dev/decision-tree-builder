@@ -72,6 +72,7 @@ const convertToReactFlowEdges = (decisionNodes: DecisionNode[]): Edge[] => {
         edges.push({
           id: `${node.id}-${oc.optionId}-${oc.targetNodeId}`,
           source: node.id,
+          sourceHandle: oc.optionId,
           target: oc.targetNodeId,
           type: 'smoothstep'
         });

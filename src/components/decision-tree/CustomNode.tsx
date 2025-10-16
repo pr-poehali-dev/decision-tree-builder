@@ -79,33 +79,74 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
                           <Icon name="ArrowRight" size={12} className="text-primary shrink-0" />
                         )}
                         <RadioGroupItem value={option.id} id={option.id} className="shrink-0" />
+                        {hasConnection && (
+                          <Handle
+                            type="source"
+                            position={Position.Right}
+                            id={option.id}
+                            style={{
+                              background: '#3b82f6',
+                              width: 8,
+                              height: 8,
+                              right: -4,
+                              top: '50%',
+                              transform: 'translateY(-50%)'
+                            }}
+                          />
+                        )}
                       </div>
                     );
                   })}
                 </RadioGroup>
               ) : (
-                node.options.map((option) => (
-                  <div key={option.id} className="flex items-start space-x-2">
-                    <Checkbox id={option.id} />
-                    <Label
-                      htmlFor={option.id}
-                      className="text-xs font-normal leading-relaxed cursor-pointer"
-                    >
-                      {option.label}
-                    </Label>
-                  </div>
-                ))
+                node.options.map((option) => {
+                  const hasConnection = node.optionConnections?.some(
+                    oc => oc.optionId === option.id
+                  );
+                  return (
+                    <div key={option.id} className="flex items-center gap-2 relative">
+                      <Checkbox id={option.id} />
+                      <Label
+                        htmlFor={option.id}
+                        className="text-xs font-normal leading-relaxed cursor-pointer flex-1"
+                      >
+                        {option.label}
+                      </Label>
+                      {hasConnection && (
+                        <>
+                          <div className="flex-1 border-b border-dashed border-muted-foreground/30 mx-2 min-w-[20px]" />
+                          <Icon name="ArrowRight" size={12} className="text-primary shrink-0" />
+                          <Handle
+                            type="source"
+                            position={Position.Right}
+                            id={option.id}
+                            style={{
+                              background: '#3b82f6',
+                              width: 8,
+                              height: 8,
+                              right: -4,
+                              top: '50%',
+                              transform: 'translateY(-50%)'
+                            }}
+                          />
+                        </>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           )}
         </div>
       </Card>
 
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={{ background: '#555', width: 10, height: 10 }}
-      />
+      {node.type === 'end' && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          style={{ background: '#555', width: 10, height: 10 }}
+        />
+      )}
     </>
   );
 });
