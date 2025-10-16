@@ -222,19 +222,22 @@ export const useDecisionTreeFlow = () => {
       if (node.id === nodeId) {
         const optionConnections = node.optionConnections || [];
         const existingConnection = optionConnections.find(oc => oc.optionId === optionId);
-        if (existingConnection) {
-          return {
-            ...node,
-            optionConnections: optionConnections.map(oc =>
-              oc.optionId === optionId ? { ...oc, targetNodeId } : oc
-            )
-          };
-        } else {
-          return {
-            ...node,
-            optionConnections: [...optionConnections, { optionId, targetNodeId }]
-          };
+        const updatedNode = existingConnection
+          ? {
+              ...node,
+              optionConnections: optionConnections.map(oc =>
+                oc.optionId === optionId ? { ...oc, targetNodeId } : oc
+              )
+            }
+          : {
+              ...node,
+              optionConnections: [...optionConnections, { optionId, targetNodeId }]
+            };
+        
+        if (editingNode && editingNode.id === nodeId) {
+          setEditingNode(updatedNode);
         }
+        return updatedNode;
       }
       return node;
     }));
@@ -243,10 +246,15 @@ export const useDecisionTreeFlow = () => {
   const handleRemoveOptionConnection = (nodeId: string, optionId: string) => {
     setDecisionNodes(prev => prev.map(node => {
       if (node.id === nodeId) {
-        return {
+        const updatedNode = {
           ...node,
           optionConnections: (node.optionConnections || []).filter(oc => oc.optionId !== optionId)
         };
+        
+        if (editingNode && editingNode.id === nodeId) {
+          setEditingNode(updatedNode);
+        }
+        return updatedNode;
       }
       return node;
     }));
