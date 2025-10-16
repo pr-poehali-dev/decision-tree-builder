@@ -56,13 +56,15 @@ const convertToReactFlowEdges = (decisionNodes: DecisionNode[]): Edge[] => {
   const edges: Edge[] = [];
   
   decisionNodes.forEach(node => {
+    const edgeType = node.type === 'recursive' ? 'default' : 'smoothstep';
+    
     if (node.connections && Array.isArray(node.connections)) {
       node.connections.forEach(toId => {
         edges.push({
           id: `${node.id}-${toId}`,
           source: node.id,
           target: toId,
-          type: 'smoothstep',
+          type: edgeType,
           markerEnd: {
             type: 'arrowclosed',
             color: '#94a3b8'
@@ -78,7 +80,7 @@ const convertToReactFlowEdges = (decisionNodes: DecisionNode[]): Edge[] => {
           source: node.id,
           sourceHandle: oc.optionId,
           target: oc.targetNodeId,
-          type: 'smoothstep',
+          type: edgeType,
           markerEnd: {
             type: 'arrowclosed',
             color: '#94a3b8'

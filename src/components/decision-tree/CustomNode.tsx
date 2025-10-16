@@ -32,7 +32,8 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
                 'flex items-center justify-center w-10 h-10 rounded-lg shrink-0',
                 node.type === 'single' && 'bg-primary text-primary-foreground',
                 node.type === 'multi' && 'bg-secondary text-secondary-foreground',
-                node.type === 'end' && 'bg-destructive text-destructive-foreground'
+                node.type === 'end' && 'bg-destructive text-destructive-foreground',
+                node.type === 'recursive' && 'bg-violet-600 text-white'
               )}
             >
               <Icon
@@ -41,6 +42,8 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
                     ? 'Circle'
                     : node.type === 'end'
                     ? 'Flag'
+                    : node.type === 'recursive'
+                    ? 'RefreshCw'
                     : 'GitBranch'
                 }
                 size={20}
@@ -58,7 +61,7 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
 
           {node.options && node.options.length > 0 && (
             <div className="space-y-2 mt-3">
-              {node.type === 'single' ? (
+              {(node.type === 'single' || node.type === 'recursive') ? (
                 <RadioGroup>
                   {node.options.map((option) => {
                     const hasConnection = node.optionConnections?.some(

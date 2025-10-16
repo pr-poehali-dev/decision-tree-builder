@@ -1,4 +1,4 @@
-export type NodeType = 'single' | 'multi' | 'end';
+export type NodeType = 'single' | 'multi' | 'end' | 'recursive';
 
 export interface NodeOption {
   id: string;

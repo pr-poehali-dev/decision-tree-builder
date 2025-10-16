@@ -40,6 +40,7 @@ export const AddNodeDialog = ({
               <SelectContent>
                 <SelectItem value="single">Single (Radio buttons)</SelectItem>
                 <SelectItem value="multi">Multi (Checkboxes)</SelectItem>
+                <SelectItem value="recursive">Recursive (Loop)</SelectItem>
                 <SelectItem value="end">End (Result)</SelectItem>
               </SelectContent>
             </Select>

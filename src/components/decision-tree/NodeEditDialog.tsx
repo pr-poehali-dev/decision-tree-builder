@@ -57,6 +57,7 @@ export const NodeEditDialog = ({
               <SelectContent>
                 <SelectItem value="single">Single (Radio buttons)</SelectItem>
                 <SelectItem value="multi">Multi (Checkboxes)</SelectItem>
+                <SelectItem value="recursive">Recursive (Loop)</SelectItem>
                 <SelectItem value="end">End (Result)</SelectItem>
               </SelectContent>
             </Select>
@@ -110,7 +111,7 @@ export const NodeEditDialog = ({
                         <Icon name="X" size={16} />
                       </Button>
                     </div>
-                    {editingNode.type === 'single' && (
+                    {(editingNode.type === 'single' || editingNode.type === 'recursive') && (
                       <div className="flex items-center gap-2">
                         <Label className="text-xs text-muted-foreground">Connects to:</Label>
                         <Select
