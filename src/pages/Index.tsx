@@ -14,12 +14,17 @@ import Icon from '@/components/ui/icon';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
-type NodeType = 'start' | 'decision' | 'end';
+type NodeType = 'single' | 'multi' | 'end';
 
 interface NodeOption {
   id: string;
   label: string;
   type: 'checkbox' | 'radio';
+}
+
+interface OptionConnection {
+  optionId: string;
+  targetNodeId: string;
 }
 
 interface DecisionNode {
@@ -29,6 +34,7 @@ interface DecisionNode {
   description?: string;
   options: NodeOption[];
   connections: string[];
+  optionConnections: OptionConnection[];
   position: { x: number; y: number };
 }
 
@@ -71,66 +77,52 @@ const Index = () => {
     return [
     {
       id: 'node-1',
-      type: 'start',
+      type: 'single',
       title: 'CLINICAL PRESENTATION',
       description: 'Initial patient assessment',
       options: [
-        { id: 'opt-1', label: 'Pedunculated or sessile polyp (adenoma) with invasive cancer', type: 'radio' },
-        { id: 'opt-2', label: 'Colon cancer appropriate for resection (Non-metastatic)', type: 'radio' },
-        { id: 'opt-3', label: 'Suspected or proven metastatic adenocarcinoma', type: 'radio' }
+        { id: 'opt-1', label: 'Pedunculated or sessile polyp', type: 'radio' },
+        { id: 'opt-2', label: 'Colon cancer for resection', type: 'radio' },
+        { id: 'opt-3', label: 'Metastatic adenocarcinoma', type: 'radio' }
       ],
-      connections: ['node-2'],
+      connections: [],
+      optionConnections: [],
       position: { x: 50, y: 150 }
     },
     {
       id: 'node-2',
-      type: 'decision',
+      type: 'multi',
       title: 'FINDINGS',
       options: [
         { id: 'opt-4', label: 'Pathology review', type: 'checkbox' },
-        { id: 'opt-5', label: 'Colonoscopy', type: 'checkbox' },
-        { id: 'opt-6', label: 'Laboratory studies', type: 'checkbox' },
-        { id: 'opt-7', label: 'Inherited testing', type: 'checkbox' }
+        { id: 'opt-5', label: 'Colonoscopy', type: 'checkbox' }
       ],
-      connections: ['node-3'],
-      position: { x: 350, y: 100 }
+      connections: [],
+      optionConnections: [],
+      position: { x: 400, y: 150 }
     },
     {
       id: 'node-3',
-      type: 'decision',
-      title: 'WORKUP',
-      options: [
-        { id: 'opt-8', label: 'CBC, chemistry profile, CEA', type: 'checkbox' },
-        { id: 'opt-9', label: 'Colonoscopy/endoscopy', type: 'checkbox' }
-      ],
-      connections: ['node-4', 'node-5'],
-      position: { x: 650, y: 100 }
-    },
-    {
-      id: 'node-4',
       type: 'end',
-      title: 'TREATMENT: PEDUNCULATED',
-      description: 'Treatment option A',
-      options: [{ id: 'opt-10', label: 'Observe', type: 'radio' }],
+      title: 'TREATMENT PLAN',
+      description: 'Final recommendation',
+      options: [],
       connections: [],
-      position: { x: 950, y: 50 }
-    },
-    {
-      id: 'node-5',
-      type: 'end',
-      title: 'TREATMENT: SESSILE',
-      options: [{ id: 'opt-11', label: 'Observe', type: 'radio' }],
-      connections: [],
-      position: { x: 950, y: 250 }
+      optionConnections: [],
+      position: { x: 750, y: 150 }
     }];
   });
 
   const [newNode, setNewNode] = useState<Partial<DecisionNode>>({
-    type: 'decision',
+    type: 'single',
     title: '',
     description: '',
-    options: []
+    options: [],
+    optionConnections: []
   });
+
+  const [isOptionConnectionDialogOpen, setIsOptionConnectionDialogOpen] = useState(false);
+  const [selectedOptionForConnection, setSelectedOptionForConnection] = useState<{nodeId: string, optionId: string} | null>(null);
 
   const handleNodeDragStart = (e: React.MouseEvent, nodeId: string) => {
     if ((e.target as HTMLElement).closest('input, button, label')) return;
@@ -209,17 +201,18 @@ const Index = () => {
     const id = `node-${Date.now()}`;
     const node: DecisionNode = {
       id,
-      type: newNode.type as NodeType || 'decision',
+      type: newNode.type as NodeType || 'single',
       title: newNode.title,
       description: newNode.description,
       options: newNode.options || [],
       connections: [],
+      optionConnections: [],
       position: { x: 400, y: 300 }
     };
 
     setNodes(prev => [...prev, node]);
     setIsAddNodeDialogOpen(false);
-    setNewNode({ type: 'decision', title: '', description: '', options: [] });
+    setNewNode({ type: 'single', title: '', description: '', options: [], optionConnections: [] });
     toast({ title: 'Node created successfully' });
   };
 
@@ -232,6 +225,40 @@ const Index = () => {
           connections: hasConnection
             ? node.connections.filter(c => c !== toId)
             : [...node.connections, toId]
+        };
+      }
+      return node;
+    }));
+  };
+
+  const handleConnectOption = (nodeId: string, optionId: string, targetNodeId: string) => {
+    setNodes(prev => prev.map(node => {
+      if (node.id === nodeId) {
+        const existingConnection = node.optionConnections.find(oc => oc.optionId === optionId);
+        if (existingConnection) {
+          return {
+            ...node,
+            optionConnections: node.optionConnections.map(oc =>
+              oc.optionId === optionId ? { ...oc, targetNodeId } : oc
+            )
+          };
+        } else {
+          return {
+            ...node,
+            optionConnections: [...node.optionConnections, { optionId, targetNodeId }]
+          };
+        }
+      }
+      return node;
+    }));
+  };
+
+  const handleRemoveOptionConnection = (nodeId: string, optionId: string) => {
+    setNodes(prev => prev.map(node => {
+      if (node.id === nodeId) {
+        return {
+          ...node,
+          optionConnections: node.optionConnections.filter(oc => oc.optionId !== optionId)
         };
       }
       return node;
@@ -282,11 +309,20 @@ const Index = () => {
     });
   };
 
+  const getTargetNodeForOption = (nodeId: string, optionId: string): string | null => {
+    const node = nodes.find(n => n.id === nodeId);
+    const connection = node?.optionConnections.find(oc => oc.optionId === optionId);
+    return connection?.targetNodeId || null;
+  };
+
   const getConnections = (): Connection[] => {
     const connections: Connection[] = [];
     nodes.forEach(node => {
       node.connections.forEach(toId => {
         connections.push({ from: node.id, to: toId });
+      });
+      node.optionConnections.forEach(oc => {
+        connections.push({ from: node.id, to: oc.targetNodeId });
       });
     });
     return connections;
@@ -582,15 +618,15 @@ const Index = () => {
                         <div
                           className={cn(
                             'flex items-center justify-center w-10 h-10 rounded-lg shrink-0',
-                            node.type === 'start' && 'bg-primary text-primary-foreground',
-                            node.type === 'decision' && 'bg-secondary text-secondary-foreground',
+                            node.type === 'single' && 'bg-primary text-primary-foreground',
+                            node.type === 'multi' && 'bg-secondary text-secondary-foreground',
                             node.type === 'end' && 'bg-destructive text-destructive-foreground'
                           )}
                         >
                           <Icon
                             name={
-                              node.type === 'start'
-                                ? 'PlayCircle'
+                              node.type === 'single'
+                                ? 'Circle'
                                 : node.type === 'end'
                                 ? 'Flag'
                                 : 'GitBranch'
@@ -610,19 +646,27 @@ const Index = () => {
 
                       {node.options && node.options.length > 0 && (
                         <div className="space-y-2 mt-3">
-                          {node.options[0]?.type === 'radio' ? (
+                          {node.type === 'single' ? (
                             <RadioGroup>
-                              {node.options.map((option) => (
-                                <div key={option.id} className="flex items-start space-x-2">
-                                  <RadioGroupItem value={option.id} id={option.id} />
-                                  <Label
-                                    htmlFor={option.id}
-                                    className="text-xs font-normal leading-relaxed cursor-pointer"
-                                  >
-                                    {option.label}
-                                  </Label>
-                                </div>
-                              ))}
+                              {node.options.map((option) => {
+                                const targetId = getTargetNodeForOption(node.id, option.id);
+                                return (
+                                  <div key={option.id} className="flex items-start justify-between space-x-2 group">
+                                    <div className="flex items-start space-x-2 flex-1">
+                                      <RadioGroupItem value={option.id} id={option.id} />
+                                      <Label
+                                        htmlFor={option.id}
+                                        className="text-xs font-normal leading-relaxed cursor-pointer flex-1"
+                                      >
+                                        {option.label}
+                                      </Label>
+                                    </div>
+                                    {targetId && (
+                                      <Icon name="ArrowRight" size={12} className="text-primary mt-0.5" />
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </RadioGroup>
                           ) : (
                             node.options.map((option) => (
@@ -667,9 +711,9 @@ const Index = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="start">Start</SelectItem>
-                    <SelectItem value="decision">Decision</SelectItem>
-                    <SelectItem value="end">End</SelectItem>
+                    <SelectItem value="single">Single (Radio buttons)</SelectItem>
+                    <SelectItem value="multi">Multi (Checkboxes)</SelectItem>
+                    <SelectItem value="end">End (Result)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -703,24 +747,62 @@ const Index = () => {
                   </Button>
                 </div>
                 <div className="space-y-2">
-                  {editingNode.options.map((option) => (
-                    <div key={option.id} className="flex items-center gap-2">
-                      <Input
-                        value={option.label}
-                        onChange={(e) =>
-                          updateOptionInEditingNode(option.id, e.target.value)
-                        }
-                        className="flex-1"
-                      />
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => removeOptionFromEditingNode(option.id)}
-                      >
-                        <Icon name="X" size={16} />
-                      </Button>
-                    </div>
-                  ))}
+                  {editingNode.options.map((option) => {
+                    const targetId = getTargetNodeForOption(editingNode.id, option.id);
+                    const targetNode = nodes.find(n => n.id === targetId);
+                    return (
+                      <div key={option.id} className="space-y-2 border rounded-lg p-2">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={option.label}
+                            onChange={(e) =>
+                              updateOptionInEditingNode(option.id, e.target.value)
+                            }
+                            className="flex-1"
+                          />
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeOptionFromEditingNode(option.id)}
+                          >
+                            <Icon name="X" size={16} />
+                          </Button>
+                        </div>
+                        {editingNode.type === 'single' && (
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs text-muted-foreground">Connects to:</Label>
+                            <Select
+                              value={targetId || 'none'}
+                              onValueChange={(value) => {
+                                if (value === 'none') {
+                                  handleRemoveOptionConnection(editingNode.id, option.id);
+                                } else {
+                                  handleConnectOption(editingNode.id, option.id, value);
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="No connection" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No connection</SelectItem>
+                                {nodes
+                                  .filter(n => n.id !== editingNode.id)
+                                  .map(n => (
+                                    <SelectItem key={n.id} value={n.id}>
+                                      {n.title}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                            {targetNode && (
+                              <span className="text-xs text-muted-foreground">→ {targetNode.title}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -752,9 +834,9 @@ const Index = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="start">Start</SelectItem>
-                  <SelectItem value="decision">Decision</SelectItem>
-                  <SelectItem value="end">End</SelectItem>
+                  <SelectItem value="single">Single (Radio buttons)</SelectItem>
+                  <SelectItem value="multi">Multi (Checkboxes)</SelectItem>
+                  <SelectItem value="end">End (Result)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
