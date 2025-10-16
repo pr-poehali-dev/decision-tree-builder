@@ -131,9 +131,13 @@ export const useDecisionTreeFlow = () => {
   }, [decisionNodes]);
 
   useEffect(() => {
-    setNodes(convertToReactFlowNodes(decisionNodes));
+    const newNodes = convertToReactFlowNodes(decisionNodes);
+    setNodes(newNodes.map(node => ({
+      ...node,
+      selected: node.id === selectedNode
+    })));
     setEdges(convertToReactFlowEdges(decisionNodes));
-  }, [decisionNodes, setNodes, setEdges]);
+  }, [decisionNodes, selectedNode, setNodes, setEdges]);
 
   const onConnect = useCallback(
     (connection: Connection) => {

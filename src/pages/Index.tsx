@@ -114,12 +114,12 @@ const Index = () => {
     toast({ title: 'All nodes cleared' });
   };
 
-  const onSelectionChange = ({ nodes: selectedNodes }: { nodes: any[] }) => {
-    if (selectedNodes.length > 0) {
-      setSelectedNode(selectedNodes[0].id);
-    } else {
-      setSelectedNode(null);
-    }
+  const onNodeClick = (_event: React.MouseEvent, node: any) => {
+    setSelectedNode(node.id);
+  };
+
+  const onPaneClick = () => {
+    setSelectedNode(null);
   };
 
   return (
@@ -161,7 +161,8 @@ const Index = () => {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeDragStop={onNodeDragStop}
-            onSelectionChange={onSelectionChange}
+            onNodeClick={onNodeClick}
+            onPaneClick={onPaneClick}
             nodeTypes={nodeTypes}
             fitView
             defaultEdgeOptions={{
