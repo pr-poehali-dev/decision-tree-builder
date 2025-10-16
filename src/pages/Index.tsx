@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -6,19 +6,35 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Icon from '@/components/ui/icon';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 type NodeType = 'start' | 'decision' | 'end';
+
+interface NodeOption {
+  id: string;
+  label: string;
+  type: 'checkbox' | 'radio';
+}
 
 interface DecisionNode {
   id: string;
   type: NodeType;
   title: string;
   description?: string;
-  options?: { id: string; label: string; type: 'checkbox' | 'radio' }[];
-  connections?: string[];
+  options: NodeOption[];
+  connections: string[];
   position: { x: number; y: number };
+}
+
+interface Connection {
+  from: string;
+  to: string;
 }
 
 const sampleTemplates = [
@@ -40,11 +56,19 @@ const sampleTemplates = [
 ];
 
 const Index = () => {
+  const { toast } = useToast();
   const [selectedTemplate, setSelectedTemplate] = useState<string>('cancer-treatment');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [selectedNode, setSelectedNode] = useState<string | null>('node-1');
-  
-  const [nodes] = useState<DecisionNode[]>([
+  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [editingNode, setEditingNode] = useState<DecisionNode | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAddNodeDialogOpen, setIsAddNodeDialogOpen] = useState(false);
+  const [draggedNode, setDraggedNode] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  const [nodes, setNodes] = useState<DecisionNode[]>([
     {
       id: 'node-1',
       type: 'start',
@@ -55,6 +79,7 @@ const Index = () => {
         { id: 'opt-2', label: 'Colon cancer appropriate for resection (Non-metastatic)', type: 'radio' },
         { id: 'opt-3', label: 'Suspected or proven metastatic adenocarcinoma', type: 'radio' }
       ],
+      connections: ['node-2'],
       position: { x: 50, y: 150 }
     },
     {
@@ -64,9 +89,10 @@ const Index = () => {
       options: [
         { id: 'opt-4', label: 'Pathology review', type: 'checkbox' },
         { id: 'opt-5', label: 'Colonoscopy', type: 'checkbox' },
-        { id: 'opt-6', label: 'Laboratory studies (at time of colonoscopy or within 2 weeks if appropriate)', type: 'checkbox' },
+        { id: 'opt-6', label: 'Laboratory studies', type: 'checkbox' },
         { id: 'opt-7', label: 'Inherited testing', type: 'checkbox' }
       ],
+      connections: ['node-3'],
       position: { x: 350, y: 100 }
     },
     {
@@ -77,28 +103,190 @@ const Index = () => {
         { id: 'opt-8', label: 'CBC, chemistry profile, CEA', type: 'checkbox' },
         { id: 'opt-9', label: 'Colonoscopy/endoscopy', type: 'checkbox' }
       ],
+      connections: ['node-4', 'node-5'],
       position: { x: 650, y: 100 }
     },
     {
       id: 'node-4',
       type: 'end',
-      title: 'TREATMENT: PEDUNCULATED POLYP WITH INVASIVE CANCER',
-      description: 'Competing with an icon derivae of regional lymph nodes',
-      options: [
-        { id: 'opt-10', label: 'Observe', type: 'radio' }
-      ],
+      title: 'TREATMENT: PEDUNCULATED',
+      description: 'Treatment option A',
+      options: [{ id: 'opt-10', label: 'Observe', type: 'radio' }],
+      connections: [],
       position: { x: 950, y: 50 }
     },
     {
       id: 'node-5',
       type: 'end',
-      title: 'TREATMENT: SESSILE POLYP WITH INVASIVE CANCER',
-      options: [
-        { id: 'opt-11', label: 'Observe', type: 'radio' }
-      ],
+      title: 'TREATMENT: SESSILE',
+      options: [{ id: 'opt-11', label: 'Observe', type: 'radio' }],
+      connections: [],
       position: { x: 950, y: 250 }
     }
   ]);
+
+  const [newNode, setNewNode] = useState<Partial<DecisionNode>>({
+    type: 'decision',
+    title: '',
+    description: '',
+    options: []
+  });
+
+  const handleNodeDragStart = (e: React.MouseEvent, nodeId: string) => {
+    if ((e.target as HTMLElement).closest('input, button, label')) return;
+    
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    setDraggedNode(nodeId);
+    setDragOffset({
+      x: e.clientX - node.position.x,
+      y: e.clientY - node.position.y
+    });
+  };
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!draggedNode || !canvasRef.current) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left - dragOffset.x;
+    const y = e.clientY - rect.top - dragOffset.y;
+
+    setNodes(prev => prev.map(node =>
+      node.id === draggedNode
+        ? { ...node, position: { x: Math.max(0, x), y: Math.max(0, y) } }
+        : node
+    ));
+  }, [draggedNode, dragOffset]);
+
+  const handleMouseUp = useCallback(() => {
+    setDraggedNode(null);
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [handleMouseMove, handleMouseUp]);
+
+  const handleEditNode = (node: DecisionNode) => {
+    setEditingNode({ ...node });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveNode = () => {
+    if (!editingNode) return;
+
+    setNodes(prev => prev.map(node =>
+      node.id === editingNode.id ? editingNode : node
+    ));
+    setIsEditDialogOpen(false);
+    toast({ title: 'Node updated successfully' });
+  };
+
+  const handleDeleteNode = (nodeId: string) => {
+    setNodes(prev => prev.filter(n => n.id !== nodeId).map(node => ({
+      ...node,
+      connections: node.connections.filter(c => c !== nodeId)
+    })));
+    setSelectedNode(null);
+    toast({ title: 'Node deleted' });
+  };
+
+  const handleAddNode = () => {
+    if (!newNode.title) {
+      toast({ title: 'Please enter a title', variant: 'destructive' });
+      return;
+    }
+
+    const id = `node-${Date.now()}`;
+    const node: DecisionNode = {
+      id,
+      type: newNode.type as NodeType || 'decision',
+      title: newNode.title,
+      description: newNode.description,
+      options: newNode.options || [],
+      connections: [],
+      position: { x: 400, y: 300 }
+    };
+
+    setNodes(prev => [...prev, node]);
+    setIsAddNodeDialogOpen(false);
+    setNewNode({ type: 'decision', title: '', description: '', options: [] });
+    toast({ title: 'Node created successfully' });
+  };
+
+  const handleToggleConnection = (fromId: string, toId: string) => {
+    setNodes(prev => prev.map(node => {
+      if (node.id === fromId) {
+        const hasConnection = node.connections.includes(toId);
+        return {
+          ...node,
+          connections: hasConnection
+            ? node.connections.filter(c => c !== toId)
+            : [...node.connections, toId]
+        };
+      }
+      return node;
+    }));
+  };
+
+  const handleStartConnection = (nodeId: string) => {
+    setConnectingFrom(nodeId);
+    toast({ title: 'Click on another node to connect' });
+  };
+
+  const handleCompleteConnection = (toNodeId: string) => {
+    if (connectingFrom && connectingFrom !== toNodeId) {
+      handleToggleConnection(connectingFrom, toNodeId);
+      toast({ title: 'Connection created' });
+    }
+    setConnectingFrom(null);
+  };
+
+  const addOptionToEditingNode = () => {
+    if (!editingNode) return;
+    const newOption: NodeOption = {
+      id: `opt-${Date.now()}`,
+      label: 'New option',
+      type: 'checkbox'
+    };
+    setEditingNode({
+      ...editingNode,
+      options: [...editingNode.options, newOption]
+    });
+  };
+
+  const removeOptionFromEditingNode = (optionId: string) => {
+    if (!editingNode) return;
+    setEditingNode({
+      ...editingNode,
+      options: editingNode.options.filter(o => o.id !== optionId)
+    });
+  };
+
+  const updateOptionInEditingNode = (optionId: string, label: string) => {
+    if (!editingNode) return;
+    setEditingNode({
+      ...editingNode,
+      options: editingNode.options.map(o =>
+        o.id === optionId ? { ...o, label } : o
+      )
+    });
+  };
+
+  const getConnections = (): Connection[] => {
+    const connections: Connection[] = [];
+    nodes.forEach(node => {
+      node.connections.forEach(toId => {
+        connections.push({ from: node.id, to: toId });
+      });
+    });
+    return connections;
+  };
 
   return (
     <div className="flex h-screen bg-background font-inter">
@@ -143,30 +331,54 @@ const Index = () => {
 
             <Separator className="my-4 bg-sidebar-border" />
 
-            <div className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60">
-                Primary Treatment
-              </h3>
-              <div className="space-y-1 text-sm text-sidebar-foreground/80">
-                <div className="px-3 py-1.5">pMMR or MSS</div>
-                <div className="px-3 py-1.5">dMMR/MSH-H or POLE/POLD1 mutation</div>
-              </div>
+            <Button
+              onClick={() => setIsAddNodeDialogOpen(true)}
+              className="w-full bg-primary hover:bg-primary/90"
+            >
+              <Icon name="Plus" size={16} className="mr-2" />
+              Add Node
+            </Button>
 
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60 mt-4">
-                Adjuvant Treatment
-              </h3>
-              <div className="space-y-1 text-sm text-sidebar-foreground/80">
-                <div className="px-3 py-1.5">Localized Disease</div>
-              </div>
-
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60 mt-4">
-                Surveillance
-              </h3>
-
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60 mt-4">
-                Recurrence
-              </h3>
-            </div>
+            {selectedNode && (
+              <>
+                <Separator className="my-4 bg-sidebar-border" />
+                <div className="space-y-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60">
+                    Selected Node
+                  </h3>
+                  <Button
+                    onClick={() => {
+                      const node = nodes.find(n => n.id === selectedNode);
+                      if (node) handleEditNode(node);
+                    }}
+                    variant="secondary"
+                    size="sm"
+                    className="w-full"
+                  >
+                    <Icon name="Edit" size={14} className="mr-2" />
+                    Edit Node
+                  </Button>
+                  <Button
+                    onClick={() => handleStartConnection(selectedNode)}
+                    variant="secondary"
+                    size="sm"
+                    className="w-full"
+                  >
+                    <Icon name="Link" size={14} className="mr-2" />
+                    Add Connection
+                  </Button>
+                  <Button
+                    onClick={() => handleDeleteNode(selectedNode)}
+                    variant="destructive"
+                    size="sm"
+                    className="w-full"
+                  >
+                    <Icon name="Trash2" size={14} className="mr-2" />
+                    Delete Node
+                  </Button>
+                </div>
+              </>
+            )}
           </ScrollArea>
         )}
       </aside>
@@ -175,28 +387,27 @@ const Index = () => {
         <header className="flex items-center justify-between px-6 py-3 border-b bg-white">
           <div className="flex items-center gap-3">
             <h2 className="text-base font-semibold text-foreground">
-              Pedunculated or Sessile Polyp (Adenoma) with Invasive Cancer
+              Decision Tree Editor
             </h2>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" onClick={() => setNodes([])}>
               <Icon name="RotateCcw" size={16} className="mr-2" />
-              Reset
+              Clear All
             </Button>
             <Button variant="ghost" size="sm">
-              <Icon name="Maximize2" size={16} className="mr-2" />
-              Fullscreen
+              <Icon name="Download" size={16} className="mr-2" />
+              Export
             </Button>
-            <Label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" className="rounded" />
-              Non-active paths
-            </Label>
           </div>
         </header>
 
         <div className="flex-1 overflow-hidden bg-muted/30">
           <ScrollArea className="h-full">
-            <div className="relative min-h-[800px] p-8">
+            <div
+              ref={canvasRef}
+              className="relative min-h-[1000px] min-w-[1400px] p-8"
+            >
               <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
                 <defs>
                   <marker
@@ -209,44 +420,43 @@ const Index = () => {
                   >
                     <polygon points="0 0, 10 3, 0 6" fill="#94a3b8" />
                   </marker>
+                  <marker
+                    id="arrowhead-active"
+                    markerWidth="10"
+                    markerHeight="10"
+                    refX="9"
+                    refY="3"
+                    orient="auto"
+                  >
+                    <polygon points="0 0, 10 3, 0 6" fill="#0ea5e9" />
+                  </marker>
                 </defs>
-                
-                <line
-                  x1="240"
-                  y1="200"
-                  x2="340"
-                  y2="180"
-                  stroke="#94a3b8"
-                  strokeWidth="2"
-                  markerEnd="url(#arrowhead)"
-                />
-                <line
-                  x1="540"
-                  y1="180"
-                  x2="640"
-                  y2="180"
-                  stroke="#94a3b8"
-                  strokeWidth="2"
-                  markerEnd="url(#arrowhead)"
-                />
-                <line
-                  x1="830"
-                  y1="150"
-                  x2="940"
-                  y2="120"
-                  stroke="#94a3b8"
-                  strokeWidth="2"
-                  markerEnd="url(#arrowhead)"
-                />
-                <line
-                  x1="830"
-                  y1="200"
-                  x2="940"
-                  y2="300"
-                  stroke="#94a3b8"
-                  strokeWidth="2"
-                  markerEnd="url(#arrowhead)"
-                />
+
+                {getConnections().map((conn, idx) => {
+                  const fromNode = nodes.find(n => n.id === conn.from);
+                  const toNode = nodes.find(n => n.id === conn.to);
+                  if (!fromNode || !toNode) return null;
+
+                  const fromX = fromNode.position.x + 280;
+                  const fromY = fromNode.position.y + 60;
+                  const toX = toNode.position.x;
+                  const toY = toNode.position.y + 60;
+
+                  const isActive = selectedNode === conn.from || selectedNode === conn.to;
+
+                  return (
+                    <line
+                      key={idx}
+                      x1={fromX}
+                      y1={fromY}
+                      x2={toX}
+                      y2={toY}
+                      stroke={isActive ? '#0ea5e9' : '#94a3b8'}
+                      strokeWidth={isActive ? '3' : '2'}
+                      markerEnd={isActive ? 'url(#arrowhead-active)' : 'url(#arrowhead)'}
+                    />
+                  );
+                })}
               </svg>
 
               {nodes.map((node) => (
@@ -256,17 +466,28 @@ const Index = () => {
                   style={{
                     left: `${node.position.x}px`,
                     top: `${node.position.y}px`,
-                    zIndex: 1
+                    zIndex: draggedNode === node.id ? 10 : 1,
+                    cursor: draggedNode === node.id ? 'grabbing' : 'grab'
                   }}
+                  onMouseDown={(e) => handleNodeDragStart(e, node.id)}
                 >
                   <Card
                     className={cn(
-                      'w-[280px] transition-all duration-200 hover:shadow-lg cursor-pointer',
+                      'w-[280px] transition-all duration-200 hover:shadow-lg',
                       selectedNode === node.id
                         ? 'ring-2 ring-primary shadow-lg'
+                        : connectingFrom === node.id
+                        ? 'ring-2 ring-secondary shadow-lg'
                         : 'hover:ring-1 hover:ring-border'
                     )}
-                    onClick={() => setSelectedNode(node.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (connectingFrom && connectingFrom !== node.id) {
+                        handleCompleteConnection(node.id);
+                      } else {
+                        setSelectedNode(node.id);
+                      }
+                    }}
                   >
                     <div className="p-4">
                       <div className="flex items-start gap-3 mb-3">
@@ -274,8 +495,8 @@ const Index = () => {
                           className={cn(
                             'flex items-center justify-center w-10 h-10 rounded-lg shrink-0',
                             node.type === 'start' && 'bg-primary text-primary-foreground',
-                            node.type === 'decision' && 'bg-info text-white',
-                            node.type === 'end' && 'bg-info text-white'
+                            node.type === 'decision' && 'bg-secondary text-secondary-foreground',
+                            node.type === 'end' && 'bg-destructive text-destructive-foreground'
                           )}
                         >
                           <Icon
@@ -301,7 +522,7 @@ const Index = () => {
 
                       {node.options && node.options.length > 0 && (
                         <div className="space-y-2 mt-3">
-                          {node.options[0].type === 'radio' ? (
+                          {node.options[0]?.type === 'radio' ? (
                             <RadioGroup>
                               {node.options.map((option) => (
                                 <div key={option.id} className="flex items-start space-x-2">
@@ -330,15 +551,6 @@ const Index = () => {
                           )}
                         </div>
                       )}
-
-                      {node.type !== 'start' && (
-                        <Button
-                          size="sm"
-                          className="w-full mt-4 bg-secondary hover:bg-secondary/90"
-                        >
-                          Continue →
-                        </Button>
-                      )}
                     </div>
                   </Card>
                 </div>
@@ -348,10 +560,162 @@ const Index = () => {
         </div>
       </main>
 
-      <div className="fixed bottom-4 right-4 flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-full shadow-lg">
-        <Icon name="Zap" size={16} />
-        <span className="text-sm font-medium">Interactive Mode</span>
-      </div>
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Node</DialogTitle>
+          </DialogHeader>
+          {editingNode && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Node Type</Label>
+                <Select
+                  value={editingNode.type}
+                  onValueChange={(value: NodeType) =>
+                    setEditingNode({ ...editingNode, type: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="start">Start</SelectItem>
+                    <SelectItem value="decision">Decision</SelectItem>
+                    <SelectItem value="end">End</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Title</Label>
+                <Input
+                  value={editingNode.title}
+                  onChange={(e) =>
+                    setEditingNode({ ...editingNode, title: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Description (optional)</Label>
+                <Textarea
+                  value={editingNode.description || ''}
+                  onChange={(e) =>
+                    setEditingNode({ ...editingNode, description: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Options</Label>
+                  <Button size="sm" onClick={addOptionToEditingNode}>
+                    <Icon name="Plus" size={14} className="mr-1" />
+                    Add Option
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {editingNode.options.map((option) => (
+                    <div key={option.id} className="flex items-center gap-2">
+                      <Input
+                        value={option.label}
+                        onChange={(e) =>
+                          updateOptionInEditingNode(option.id, e.target.value)
+                        }
+                        className="flex-1"
+                      />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => removeOptionFromEditingNode(option.id)}
+                      >
+                        <Icon name="X" size={16} />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveNode}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAddNodeDialogOpen} onOpenChange={setIsAddNodeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Node</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Node Type</Label>
+              <Select
+                value={newNode.type}
+                onValueChange={(value: NodeType) =>
+                  setNewNode({ ...newNode, type: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="start">Start</SelectItem>
+                  <SelectItem value="decision">Decision</SelectItem>
+                  <SelectItem value="end">End</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Title</Label>
+              <Input
+                value={newNode.title}
+                onChange={(e) =>
+                  setNewNode({ ...newNode, title: e.target.value })
+                }
+                placeholder="Enter node title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description (optional)</Label>
+              <Textarea
+                value={newNode.description}
+                onChange={(e) =>
+                  setNewNode({ ...newNode, description: e.target.value })
+                }
+                placeholder="Enter description"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddNodeDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddNode}>Add Node</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {connectingFrom && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-secondary text-secondary-foreground px-4 py-2 rounded-full shadow-lg z-50">
+          <Icon name="Link" size={16} />
+          <span className="text-sm font-medium">Click on a node to connect</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setConnectingFrom(null)}
+            className="h-6 w-6 p-0"
+          >
+            <Icon name="X" size={14} />
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
