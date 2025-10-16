@@ -84,43 +84,65 @@ export const DecisionTreeCanvas = ({
             const strokeWidth = isActive ? '3' : '2';
 
             const radius = 20;
-            const midX = (fromCenterX + toCenterX) / 2;
+            
+            let startX = fromCenterX;
+            let startY = fromCenterY;
+            let endX = toCenterX;
+            let endY = toCenterY;
+
+            if (fromCenterX < toCenterX) {
+              startX = fromNode.position.x + nodeWidth;
+              endX = toNode.position.x;
+            } else if (fromCenterX > toCenterX) {
+              startX = fromNode.position.x;
+              endX = toNode.position.x + nodeWidth;
+            }
+
+            if (fromCenterY < toCenterY) {
+              startY = fromNode.position.y + nodeHeight;
+              endY = toNode.position.y;
+            } else if (fromCenterY > toCenterY) {
+              startY = fromNode.position.y;
+              endY = toNode.position.y + nodeHeight;
+            }
+
+            const midX = (startX + endX) / 2;
+            const midY = (startY + endY) / 2;
 
             let path = '';
             if (Math.abs(fromCenterX - toCenterX) > Math.abs(fromCenterY - toCenterY)) {
-              if (fromCenterY === toCenterY) {
-                path = `M ${fromCenterX} ${fromCenterY} L ${toCenterX} ${toCenterY}`;
-              } else if (fromCenterY < toCenterY) {
-                path = `M ${fromCenterX} ${fromCenterY} 
-                        L ${midX - radius} ${fromCenterY} 
-                        Q ${midX} ${fromCenterY} ${midX} ${fromCenterY + radius}
-                        L ${midX} ${toCenterY - radius}
-                        Q ${midX} ${toCenterY} ${midX + radius} ${toCenterY}
-                        L ${toCenterX} ${toCenterY}`;
+              if (startY === endY) {
+                path = `M ${startX} ${startY} L ${endX} ${endY}`;
+              } else if (startY < endY) {
+                path = `M ${startX} ${startY} 
+                        L ${midX - radius} ${startY} 
+                        Q ${midX} ${startY} ${midX} ${startY + radius}
+                        L ${midX} ${endY - radius}
+                        Q ${midX} ${endY} ${midX + radius} ${endY}
+                        L ${endX} ${endY}`;
               } else {
-                path = `M ${fromCenterX} ${fromCenterY} 
-                        L ${midX - radius} ${fromCenterY} 
-                        Q ${midX} ${fromCenterY} ${midX} ${fromCenterY - radius}
-                        L ${midX} ${toCenterY + radius}
-                        Q ${midX} ${toCenterY} ${midX + radius} ${toCenterY}
-                        L ${toCenterX} ${toCenterY}`;
+                path = `M ${startX} ${startY} 
+                        L ${midX - radius} ${startY} 
+                        Q ${midX} ${startY} ${midX} ${startY - radius}
+                        L ${midX} ${endY + radius}
+                        Q ${midX} ${endY} ${midX + radius} ${endY}
+                        L ${endX} ${endY}`;
               }
             } else {
-              const midY = (fromCenterY + toCenterY) / 2;
-              if (fromCenterX < toCenterX) {
-                path = `M ${fromCenterX} ${fromCenterY} 
-                        L ${fromCenterX} ${midY - radius} 
-                        Q ${fromCenterX} ${midY} ${fromCenterX + radius} ${midY}
-                        L ${toCenterX - radius} ${midY}
-                        Q ${toCenterX} ${midY} ${toCenterX} ${midY + radius}
-                        L ${toCenterX} ${toCenterY}`;
+              if (startX < endX) {
+                path = `M ${startX} ${startY} 
+                        L ${startX} ${midY - radius} 
+                        Q ${startX} ${midY} ${startX + radius} ${midY}
+                        L ${endX - radius} ${midY}
+                        Q ${endX} ${midY} ${endX} ${midY + radius}
+                        L ${endX} ${endY}`;
               } else {
-                path = `M ${fromCenterX} ${fromCenterY} 
-                        L ${fromCenterX} ${midY - radius} 
-                        Q ${fromCenterX} ${midY} ${fromCenterX - radius} ${midY}
-                        L ${toCenterX + radius} ${midY}
-                        Q ${toCenterX} ${midY} ${toCenterX} ${midY + radius}
-                        L ${toCenterX} ${toCenterY}`;
+                path = `M ${startX} ${startY} 
+                        L ${startX} ${midY - radius} 
+                        Q ${startX} ${midY} ${startX - radius} ${midY}
+                        L ${endX + radius} ${midY}
+                        Q ${endX} ${midY} ${endX} ${midY + radius}
+                        L ${endX} ${endY}`;
               }
             }
 
