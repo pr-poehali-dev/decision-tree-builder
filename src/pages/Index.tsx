@@ -39,25 +39,15 @@ interface Connection {
 
 const sampleTemplates = [
   {
-    id: 'cancer-treatment',
-    name: 'Pedunculated or Sessile Polyp (Adenoma) with Invasive Cancer',
-    category: 'Oncology'
-  },
-  {
-    id: 'colon-cancer',
-    name: 'Workup for Colon Cancer Appropriate for Resection',
-    category: 'Oncology'
-  },
-  {
-    id: 'metastatic',
-    name: 'Workup for Suspected or Proven Metastatic Adenocarcinoma',
-    category: 'Oncology'
+    id: 'sample-tree',
+    name: 'Sample Decision Tree',
+    category: 'Templates'
   }
 ];
 
 const Index = () => {
   const { toast } = useToast();
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('cancer-treatment');
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('sample-tree');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [editingNode, setEditingNode] = useState<DecisionNode | null>(null);
@@ -394,20 +384,22 @@ const Index = () => {
 
             <Separator className="my-4 bg-sidebar-border" />
 
-            <Button
-              onClick={() => setIsAddNodeDialogOpen(true)}
-              className="w-full bg-primary hover:bg-primary/90"
-            >
-              <Icon name="Plus" size={16} className="mr-2" />
-              Add Node
-            </Button>
+            <div className="space-y-2">
+              <Button
+                onClick={() => setIsAddNodeDialogOpen(true)}
+                className="w-full bg-primary hover:bg-primary/90"
+              >
+                <Icon name="Plus" size={16} className="mr-2" />
+                Add Node
+              </Button>
+            </div>
 
             {selectedNode && (
               <>
                 <Separator className="my-4 bg-sidebar-border" />
                 <div className="space-y-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60">
-                    Selected Node
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60 mb-2">
+                    Selected Node Actions
                   </h3>
                   <Button
                     onClick={() => {
