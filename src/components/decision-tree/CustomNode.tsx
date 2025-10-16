@@ -21,7 +21,7 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
       
       <Card
         className={cn(
-          'w-[280px] transition-all duration-200 hover:shadow-lg border-2',
+          'w-[280px] transition-all duration-200 hover:shadow-lg border-2 border-slate-400',
           selected ? 'ring-2 ring-primary shadow-lg' : ''
         )}
       >
