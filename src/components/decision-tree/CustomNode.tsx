@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import { cn } from '@/lib/utils';
 import { DecisionNode } from '@/types/decision-tree';
@@ -21,46 +22,38 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
       
       <Card
         className={cn(
-          'w-[280px] transition-all duration-200 hover:shadow-lg border-2 border-slate-400',
-          selected ? 'ring-2 ring-primary shadow-lg' : ''
+          'w-[320px] transition-all duration-200 hover:shadow-md border border-slate-200 rounded-lg overflow-hidden bg-white',
+          selected ? 'ring-2 ring-blue-500 shadow-lg' : ''
         )}
       >
-        <div className="p-4">
-          <div className="flex items-start gap-3 mb-3">
-            <div
-              className={cn(
-                'flex items-center justify-center w-10 h-10 rounded-lg shrink-0',
-                node.type === 'single' && 'bg-primary text-primary-foreground',
-                node.type === 'multi' && 'bg-secondary text-secondary-foreground',
-                node.type === 'end' && 'bg-destructive text-destructive-foreground',
-                node.type === 'recursive' && 'bg-violet-600 text-white'
-              )}
-            >
-              <Icon
-                name={
-                  node.type === 'single'
-                    ? 'Circle'
-                    : node.type === 'end'
-                    ? 'Flag'
-                    : node.type === 'recursive'
-                    ? 'RefreshCw'
-                    : 'GitBranch'
-                }
-                size={20}
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">
-                {node.title}
-              </h3>
-              {node.description && (
-                <p className="text-xs text-muted-foreground">{node.description}</p>
-              )}
-            </div>
+        <div className="bg-blue-600 px-4 py-2 flex items-center gap-2">
+          <div className="flex items-center justify-center w-7 h-7 bg-white/20 rounded shrink-0">
+            <Icon
+              name={
+                node.type === 'single'
+                  ? 'List'
+                  : node.type === 'end'
+                  ? 'Flag'
+                  : node.type === 'recursive'
+                  ? 'RefreshCw'
+                  : 'CheckSquare'
+              }
+              size={16}
+              className="text-white"
+            />
           </div>
+          <h3 className="text-sm font-semibold text-white tracking-tight uppercase">
+            {node.title}
+          </h3>
+        </div>
+        
+        <div className="p-4">
+          {node.description && (
+            <p className="text-sm text-slate-700 mb-4 leading-relaxed">{node.description}</p>
+          )}
 
           {node.options && node.options.length > 0 && (
-            <div className="space-y-2 mt-3">
+            <div className="space-y-3 mb-4">
               {(node.type === 'single' || node.type === 'recursive') ? (
                 <RadioGroup>
                   {node.options.map((option) => {
@@ -68,29 +61,23 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
                       oc => oc.optionId === option.id
                     );
                     return (
-                      <div key={option.id} className="flex items-center gap-2 group relative">
+                      <div key={option.id} className="flex items-start gap-2 group relative py-1">
+                        <RadioGroupItem value={option.id} id={option.id} className="shrink-0 mt-0.5" />
                         <Label
                           htmlFor={option.id}
-                          className="text-xs font-normal leading-relaxed cursor-pointer flex-1"
+                          className="text-sm font-normal leading-relaxed cursor-pointer flex-1 text-slate-700"
                         >
                           {option.label}
                         </Label>
-                        {hasConnection && (
-                          <div className="flex-1 border-b border-dashed border-muted-foreground/30 mx-2 min-w-[20px]" />
-                        )}
-                        {hasConnection && (
-                          <Icon name="ArrowRight" size={12} className="text-primary shrink-0" />
-                        )}
-                        <RadioGroupItem value={option.id} id={option.id} className="shrink-0" />
                         <Handle
                           type="source"
                           position={Position.Right}
                           id={option.id}
                           style={{
                             background: '#3b82f6',
-                            width: 8,
-                            height: 8,
-                            right: -20,
+                            width: 10,
+                            height: 10,
+                            right: -22,
                             top: '50%',
                             transform: 'translateY(-50%)',
                             opacity: hasConnection ? 1 : 0,
@@ -107,34 +94,30 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
                     oc => oc.optionId === option.id
                   );
                   return (
-                    <div key={option.id} className="flex items-center gap-2 relative">
-                      <Checkbox id={option.id} />
+                    <div key={option.id} className="flex items-start gap-2 relative py-1">
+                      <Checkbox id={option.id} className="mt-0.5" />
                       <Label
                         htmlFor={option.id}
-                        className="text-xs font-normal leading-relaxed cursor-pointer flex-1"
+                        className="text-sm font-normal leading-relaxed cursor-pointer flex-1 text-slate-700"
                       >
                         {option.label}
                       </Label>
                       {hasConnection && (
-                        <>
-                          <div className="flex-1 border-b border-dashed border-muted-foreground/30 mx-2 min-w-[20px]" />
-                          <Icon name="ArrowRight" size={12} className="text-primary shrink-0" />
-                          <Handle
-                            type="source"
-                            position={Position.Right}
-                            id={option.id}
-                            style={{
-                              background: '#3b82f6',
-                              width: 8,
-                              height: 8,
-                              right: -20,
-                              top: '50%',
-                              transform: 'translateY(-50%)',
-                              opacity: hasConnection ? 1 : 0,
-                              pointerEvents: hasConnection ? 'auto' : 'none'
-                            }}
-                          />
-                        </>
+                        <Handle
+                          type="source"
+                          position={Position.Right}
+                          id={option.id}
+                          style={{
+                            background: '#3b82f6',
+                            width: 10,
+                            height: 10,
+                            right: -22,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            opacity: hasConnection ? 1 : 0,
+                            pointerEvents: hasConnection ? 'auto' : 'none'
+                          }}
+                        />
                       )}
                     </div>
                   );
@@ -142,6 +125,12 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
               )}
             </div>
           )}
+          
+          <div className="flex justify-end pt-2 border-t border-slate-100">
+            <Button size="sm" className="bg-green-500 hover:bg-green-600 text-white text-xs px-4 rounded-full">
+              Continue
+            </Button>
+          </div>
         </div>
       </Card>
 
