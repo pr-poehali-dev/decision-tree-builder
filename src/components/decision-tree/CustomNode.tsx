@@ -79,21 +79,21 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
                           <Icon name="ArrowRight" size={12} className="text-primary shrink-0" />
                         )}
                         <RadioGroupItem value={option.id} id={option.id} className="shrink-0" />
-                        {hasConnection && (
-                          <Handle
-                            type="source"
-                            position={Position.Right}
-                            id={option.id}
-                            style={{
-                              background: '#3b82f6',
-                              width: 8,
-                              height: 8,
-                              right: -4,
-                              top: '50%',
-                              transform: 'translateY(-50%)'
-                            }}
-                          />
-                        )}
+                        <Handle
+                          type="source"
+                          position={Position.Right}
+                          id={option.id}
+                          style={{
+                            background: '#3b82f6',
+                            width: 8,
+                            height: 8,
+                            right: -20,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            opacity: hasConnection ? 1 : 0,
+                            pointerEvents: hasConnection ? 'auto' : 'none'
+                          }}
+                        />
                       </div>
                     );
                   })}
@@ -124,9 +124,11 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
                               background: '#3b82f6',
                               width: 8,
                               height: 8,
-                              right: -4,
+                              right: -20,
                               top: '50%',
-                              transform: 'translateY(-50%)'
+                              transform: 'translateY(-50%)',
+                              opacity: hasConnection ? 1 : 0,
+                              pointerEvents: hasConnection ? 'auto' : 'none'
                             }}
                           />
                         </>
