@@ -186,7 +186,8 @@ const Index = () => {
   const handleDeleteNode = (nodeId: string) => {
     setNodes(prev => prev.filter(n => n.id !== nodeId).map(node => ({
       ...node,
-      connections: node.connections.filter(c => c !== nodeId)
+      connections: (node.connections || []).filter(c => c !== nodeId),
+      optionConnections: (node.optionConnections || []).filter(oc => oc.targetNodeId !== nodeId)
     })));
     setSelectedNode(null);
     toast({ title: 'Node deleted' });
@@ -234,18 +235,19 @@ const Index = () => {
   const handleConnectOption = (nodeId: string, optionId: string, targetNodeId: string) => {
     setNodes(prev => prev.map(node => {
       if (node.id === nodeId) {
-        const existingConnection = node.optionConnections.find(oc => oc.optionId === optionId);
+        const optionConnections = node.optionConnections || [];
+        const existingConnection = optionConnections.find(oc => oc.optionId === optionId);
         if (existingConnection) {
           return {
             ...node,
-            optionConnections: node.optionConnections.map(oc =>
+            optionConnections: optionConnections.map(oc =>
               oc.optionId === optionId ? { ...oc, targetNodeId } : oc
             )
           };
         } else {
           return {
             ...node,
-            optionConnections: [...node.optionConnections, { optionId, targetNodeId }]
+            optionConnections: [...optionConnections, { optionId, targetNodeId }]
           };
         }
       }
@@ -258,7 +260,7 @@ const Index = () => {
       if (node.id === nodeId) {
         return {
           ...node,
-          optionConnections: node.optionConnections.filter(oc => oc.optionId !== optionId)
+          optionConnections: (node.optionConnections || []).filter(oc => oc.optionId !== optionId)
         };
       }
       return node;
@@ -311,19 +313,24 @@ const Index = () => {
 
   const getTargetNodeForOption = (nodeId: string, optionId: string): string | null => {
     const node = nodes.find(n => n.id === nodeId);
-    const connection = node?.optionConnections.find(oc => oc.optionId === optionId);
+    if (!node || !node.optionConnections) return null;
+    const connection = node.optionConnections.find(oc => oc.optionId === optionId);
     return connection?.targetNodeId || null;
   };
 
   const getConnections = (): Connection[] => {
     const connections: Connection[] = [];
     nodes.forEach(node => {
-      node.connections.forEach(toId => {
-        connections.push({ from: node.id, to: toId });
-      });
-      node.optionConnections.forEach(oc => {
-        connections.push({ from: node.id, to: oc.targetNodeId });
-      });
+      if (node.connections && Array.isArray(node.connections)) {
+        node.connections.forEach(toId => {
+          connections.push({ from: node.id, to: toId });
+        });
+      }
+      if (node.optionConnections && Array.isArray(node.optionConnections)) {
+        node.optionConnections.forEach(oc => {
+          connections.push({ from: node.id, to: oc.targetNodeId });
+        });
+      }
     });
     return connections;
   };
