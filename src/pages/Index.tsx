@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import Icon from '@/components/ui/icon';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import ELK from 'elkjs/lib/elk.bundled.js';
 
 type NodeType = 'single' | 'multi' | 'end';
 
@@ -64,6 +65,7 @@ const Index = () => {
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isAutoLayouting, setIsAutoLayouting] = useState(false);
 
   const [nodes, setNodes] = useState<DecisionNode[]>(() => {
     const saved = localStorage.getItem('decisionTreeNodes');
@@ -164,8 +166,21 @@ const Index = () => {
     };
   }, [handleMouseMove, handleMouseUp]);
 
+  const autoLayoutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
-    localStorage.setItem('decisionTreeNodes', JSON.stringify(nodes));
+    if (autoLayoutTimeoutRef.current) {
+      clearTimeout(autoLayoutTimeoutRef.current);
+    }
+    autoLayoutTimeoutRef.current = setTimeout(() => {
+      localStorage.setItem('decisionTreeNodes', JSON.stringify(nodes));
+    }, 500);
+
+    return () => {
+      if (autoLayoutTimeoutRef.current) {
+        clearTimeout(autoLayoutTimeoutRef.current);
+      }
+    };
   }, [nodes]);
 
   const handleEditNode = (node: DecisionNode) => {
@@ -215,6 +230,7 @@ const Index = () => {
     setIsAddNodeDialogOpen(false);
     setNewNode({ type: 'single', title: '', description: '', options: [], optionConnections: [] });
     toast({ title: 'Node created successfully' });
+    setTimeout(() => handleAutoLayout(), 100);
   };
 
   const handleToggleConnection = (fromId: string, toId: string) => {
@@ -333,6 +349,56 @@ const Index = () => {
       }
     });
     return connections;
+  };
+
+  const handleAutoLayout = async () => {
+    if (nodes.length === 0 || isAutoLayouting) return;
+    
+    setIsAutoLayouting(true);
+    try {
+      const elk = new ELK();
+      
+      const graph = {
+        id: 'root',
+        layoutOptions: {
+          'elk.algorithm': 'layered',
+          'elk.direction': 'RIGHT',
+          'elk.spacing.nodeNode': '80',
+          'elk.layered.spacing.nodeNodeBetweenLayers': '100',
+          'elk.spacing.edgeNode': '40'
+        },
+        children: nodes.map(node => ({
+          id: node.id,
+          width: 320,
+          height: 150 + (node.options?.length || 0) * 30
+        })),
+        edges: getConnections().map((conn, idx) => ({
+          id: `edge-${idx}`,
+          sources: [conn.from],
+          targets: [conn.to]
+        }))
+      };
+
+      const layout = await elk.layout(graph);
+      
+      setNodes(prev => prev.map(node => {
+        const elkNode = layout.children?.find(n => n.id === node.id);
+        if (elkNode && elkNode.x !== undefined && elkNode.y !== undefined) {
+          return {
+            ...node,
+            position: { x: elkNode.x, y: elkNode.y }
+          };
+        }
+        return node;
+      }));
+      
+      toast({ title: 'Layout applied successfully' });
+    } catch (error) {
+      console.error('Layout error:', error);
+      toast({ title: 'Layout failed', variant: 'destructive' });
+    } finally {
+      setIsAutoLayouting(false);
+    }
   };
 
   const handleExportJSON = () => {
@@ -503,6 +569,15 @@ const Index = () => {
             </h2>
           </div>
           <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleAutoLayout}
+              disabled={isAutoLayouting}
+            >
+              <Icon name="LayoutGrid" size={16} className="mr-2" />
+              {isAutoLayouting ? 'Layouting...' : 'Auto Layout'}
+            </Button>
             <Button variant="ghost" size="sm" onClick={triggerFileInput}>
               <Icon name="Upload" size={16} className="mr-2" />
               Import JSON
@@ -658,19 +733,20 @@ const Index = () => {
                               {node.options.map((option) => {
                                 const targetId = getTargetNodeForOption(node.id, option.id);
                                 return (
-                                  <div key={option.id} className="flex items-start justify-between space-x-2 group">
-                                    <div className="flex items-start space-x-2 flex-1">
-                                      <RadioGroupItem value={option.id} id={option.id} />
-                                      <Label
-                                        htmlFor={option.id}
-                                        className="text-xs font-normal leading-relaxed cursor-pointer flex-1"
-                                      >
-                                        {option.label}
-                                      </Label>
-                                    </div>
+                                  <div key={option.id} className="flex items-center gap-2 group relative">
+                                    <Label
+                                      htmlFor={option.id}
+                                      className="text-xs font-normal leading-relaxed cursor-pointer flex-1"
+                                    >
+                                      {option.label}
+                                    </Label>
                                     {targetId && (
-                                      <Icon name="ArrowRight" size={12} className="text-primary mt-0.5" />
+                                      <div className="flex-1 border-b border-dashed border-muted-foreground/30 mx-2 min-w-[20px]" />
                                     )}
+                                    {targetId && (
+                                      <Icon name="ArrowRight" size={12} className="text-primary shrink-0" />
+                                    )}
+                                    <RadioGroupItem value={option.id} id={option.id} className="shrink-0" />
                                   </div>
                                 );
                               })}
