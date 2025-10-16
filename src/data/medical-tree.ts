@@ -1,0 +1,205 @@
+import { Node, Edge } from 'reactflow';
+import { DecisionNode } from '@/types/decision-tree';
+
+export const medicalNodes: Node<DecisionNode>[] = [
+  {
+    id: '1',
+    type: 'custom',
+    position: { x: 250, y: 50 },
+    data: {
+      id: '1',
+      type: 'single',
+      title: 'CLINICAL PRESENTATION',
+      description: 'Initial assessment of the patient',
+      options: [
+        { id: '1-1', label: 'Pedunculated or sessile polyp (adenoma) with invasive cancer', type: 'radio' },
+        { id: '1-2', label: 'Colon cancer appropriate for resection (non-metastatic)', type: 'radio' },
+        { id: '1-3', label: 'Suspected or proven metastatic adenocarcinoma', type: 'radio' },
+      ],
+      connections: [],
+      optionConnections: [
+        { optionId: '1-1', targetNodeId: '2' },
+        { optionId: '1-2', targetNodeId: '3' },
+        { optionId: '1-3', targetNodeId: '4' },
+      ],
+      position: { x: 250, y: 50 },
+    },
+  },
+  {
+    id: '2',
+    type: 'custom',
+    position: { x: 750, y: 50 },
+    data: {
+      id: '2',
+      type: 'multi',
+      title: 'FINDINGS',
+      description: 'Select all applicable findings',
+      options: [
+        { id: '2-1', label: 'Pathology review', type: 'checkbox' },
+        { id: '2-2', label: 'Colonoscopy', type: 'checkbox' },
+        { id: '2-3', label: 'Carcinoembryonic antigen, blood chemistries or which additional laboratory', type: 'checkbox' },
+        { id: '2-4', label: 'Baseline testing', type: 'checkbox' },
+      ],
+      connections: [],
+      optionConnections: [
+        { optionId: '2-1', targetNodeId: '5' },
+      ],
+      position: { x: 750, y: 50 },
+    },
+  },
+  {
+    id: '3',
+    type: 'custom',
+    position: { x: 750, y: 350 },
+    data: {
+      id: '3',
+      type: 'single',
+      title: 'WORKUP',
+      description: 'Required diagnostic procedures',
+      options: [
+        { id: '3-1', label: 'Complete pelvic MRI', type: 'radio' },
+        { id: '3-2', label: 'CBC, chemistry profile, CEA', type: 'radio' },
+        { id: '3-3', label: 'Colonoscopy/proctoscopy', type: 'radio' },
+        { id: '3-4', label: 'PGD-PET scan is not indicated', type: 'radio' },
+      ],
+      connections: [],
+      optionConnections: [
+        { optionId: '3-1', targetNodeId: '6' },
+      ],
+      position: { x: 750, y: 350 },
+    },
+  },
+  {
+    id: '4',
+    type: 'custom',
+    position: { x: 750, y: 650 },
+    data: {
+      id: '4',
+      type: 'single',
+      title: 'FINDINGS',
+      description: 'Metastatic disease assessment',
+      options: [
+        { id: '4-1', label: 'Pedunculated polyp with invasive cancer', type: 'radio' },
+        { id: '4-2', label: 'Sessile polyp with invasive cancer', type: 'radio' },
+      ],
+      connections: [],
+      optionConnections: [
+        { optionId: '4-1', targetNodeId: '7' },
+        { optionId: '4-2', targetNodeId: '7' },
+      ],
+      position: { x: 750, y: 650 },
+    },
+  },
+  {
+    id: '5',
+    type: 'custom',
+    position: { x: 1250, y: 50 },
+    data: {
+      id: '5',
+      type: 'end',
+      title: 'TREATMENT: PEDUNCULATED POLYP WITH INVASIVE CANCER',
+      description: 'Completely with an intact removal of regional lymph nodes',
+      options: [
+        { id: '5-1', label: 'Observe', type: 'radio' },
+      ],
+      connections: [],
+      optionConnections: [],
+      position: { x: 1250, y: 50 },
+    },
+  },
+  {
+    id: '6',
+    type: 'custom',
+    position: { x: 1250, y: 350 },
+    data: {
+      id: '6',
+      type: 'end',
+      title: 'TREATMENT: SESSILE POLYP WITH INVASIVE CANCER',
+      description: 'Colon resection',
+      options: [
+        { id: '6-1', label: 'Colon resection', type: 'radio' },
+      ],
+      connections: [],
+      optionConnections: [],
+      position: { x: 1250, y: 350 },
+    },
+  },
+  {
+    id: '7',
+    type: 'custom',
+    position: { x: 1250, y: 650 },
+    data: {
+      id: '7',
+      type: 'end',
+      title: 'TREATMENT: RESECTABLE A 1 & VERC, OR UNRESECTABLE METASTATIC FEATURES',
+      description: 'Single specimen, completely removed with favorable or individually resectable metastatic',
+      options: [
+        { id: '7-1', label: 'Colocating with an intact removal of regional lymph nodes', type: 'radio' },
+        { id: '7-2', label: 'Fragmented specimen or margin cannot be assessed, or unfavorable histologic features', type: 'radio' },
+        { id: '7-3', label: 'Colon resection', type: 'radio' },
+      ],
+      connections: [],
+      optionConnections: [],
+      position: { x: 1250, y: 650 },
+    },
+  },
+];
+
+export const medicalEdges: Edge[] = [
+  {
+    id: 'e1-2',
+    source: '1',
+    target: '2',
+    sourceHandle: '1-1',
+    type: 'smoothstep',
+    animated: true,
+  },
+  {
+    id: 'e1-3',
+    source: '1',
+    target: '3',
+    sourceHandle: '1-2',
+    type: 'smoothstep',
+    animated: true,
+  },
+  {
+    id: 'e1-4',
+    source: '1',
+    target: '4',
+    sourceHandle: '1-3',
+    type: 'smoothstep',
+    animated: true,
+  },
+  {
+    id: 'e2-5',
+    source: '2',
+    target: '5',
+    sourceHandle: '2-1',
+    type: 'smoothstep',
+    animated: true,
+  },
+  {
+    id: 'e3-6',
+    source: '3',
+    target: '6',
+    sourceHandle: '3-1',
+    type: 'smoothstep',
+    animated: true,
+  },
+  {
+    id: 'e4-7a',
+    source: '4',
+    target: '7',
+    sourceHandle: '4-1',
+    type: 'smoothstep',
+    animated: true,
+  },
+  {
+    id: 'e4-7b',
+    source: '4',
+    target: '7',
+    sourceHandle: '4-2',
+    type: 'smoothstep',
+    animated: true,
+  },
+];
