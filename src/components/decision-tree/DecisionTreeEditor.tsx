@@ -14,13 +14,10 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { CustomNode } from './CustomNode';
-import { TableOfContents } from './TableOfContents';
 import { DecisionTreeHeader } from './DecisionTreeHeader';
 import { AddNodeDialog } from './AddNodeDialog';
 import { NodeEditDialog } from './NodeEditDialog';
 import { DecisionNode } from '@/types/decision-tree';
-import { Button } from '@/components/ui/button';
-import Icon from '@/components/ui/icon';
 
 const nodeTypes = {
   custom: CustomNode,
@@ -37,7 +34,6 @@ export function DecisionTreeEditor({
 }: DecisionTreeEditorProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [showToc, setShowToc] = useState(true);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -374,14 +370,6 @@ export function DecisionTreeEditor({
 
   return (
     <div className="flex h-screen bg-slate-50">
-      {showToc && (
-        <TableOfContents
-          nodes={decisionNodes}
-          onNodeClick={handleNodeClick}
-          onClose={() => setShowToc(false)}
-        />
-      )}
-
       <div className="flex-1 flex flex-col">
         <DecisionTreeHeader
           selectedNodeId={selectedNodeId}
@@ -396,19 +384,6 @@ export function DecisionTreeEditor({
         />
 
         <div className="flex-1 relative">
-          <div className="absolute top-4 left-4 z-10 flex gap-2">
-            {!showToc && (
-              <Button
-                onClick={() => setShowToc(true)}
-                variant="secondary"
-                size="sm"
-                className="bg-white shadow-md"
-              >
-                <Icon name="Menu" size={16} className="mr-2" />
-                Table of Contents
-              </Button>
-            )}
-          </div>
 
           <ReactFlow
             nodes={nodes}
