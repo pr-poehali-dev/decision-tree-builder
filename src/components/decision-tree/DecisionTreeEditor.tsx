@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -117,6 +117,86 @@ export function DecisionTreeEditor({
       setSelectedNodeId(null);
     }
   }, [selectedNodeId, setNodes, setEdges]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = useCallback(() => {
+    const data = {
+      nodes: nodes.map((n) => n.data),
+      edges: edges.map((e) => ({
+        source: e.source,
+        target: e.target,
+        sourceHandle: e.sourceHandle,
+        targetHandle: e.targetHandle,
+      })),
+    };
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'decision-tree.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [nodes, edges]);
+
+  const handleImport = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = JSON.parse(event.target?.result as string);
+          const importedNodes: Node<DecisionNode>[] = data.nodes.map(
+            (nodeData: DecisionNode, index: number) => ({
+              id: nodeData.id,
+              type: 'custom',
+              position: { x: 100 + index * 50, y: 100 + index * 50 },
+              data: nodeData,
+            })
+          );
+
+          const importedEdges: Edge[] = data.edges.map(
+            (edge: any, index: number) => ({
+              id: `edge-${index}`,
+              source: edge.source,
+              target: edge.target,
+              sourceHandle: edge.sourceHandle,
+              targetHandle: edge.targetHandle,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: '#3b82f6', strokeWidth: 2 },
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+                color: '#3b82f6',
+              },
+            })
+          );
+
+          setNodes(importedNodes);
+          setEdges(importedEdges);
+        } catch (error) {
+          console.error('Failed to import:', error);
+          alert('Failed to import JSON file');
+        }
+      };
+      reader.readAsText(file);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    },
+    [setNodes, setEdges]
+  );
+
+  const handleClearAll = useCallback(() => {
+    if (confirm('Are you sure you want to clear all nodes and edges?')) {
+      setNodes([]);
+      setEdges([]);
+      setSelectedNodeId(null);
+    }
+  }, [setNodes, setEdges]);
 
   const handleSaveEdit = useCallback(() => {
     setIsEditDialogOpen(false);
@@ -305,9 +385,14 @@ export function DecisionTreeEditor({
       <div className="flex-1 flex flex-col">
         <DecisionTreeHeader
           selectedNodeId={selectedNodeId}
+          fileInputRef={fileInputRef}
           onAddNode={() => setIsAddDialogOpen(true)}
           onEditNode={handleEditNode}
           onDeleteNode={handleDeleteNode}
+          onExport={handleExport}
+          onImport={handleImport}
+          onClearAll={handleClearAll}
+          onTriggerFileInput={() => fileInputRef.current?.click()}
         />
 
         <div className="flex-1 relative">
