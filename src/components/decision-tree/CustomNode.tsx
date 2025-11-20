@@ -114,14 +114,15 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
           {node.type === 'recursive' && node.defaultConnection && (
             <Handle
               type="source"
-              position={Position.Right}
+              position={Position.Top}
               id="default"
               style={{
                 background: '#10b981',
                 width: 10,
                 height: 10,
-                right: -22,
-                top: '50%',
+                top: -5,
+                left: '50%',
+                transform: 'translateX(-50%)',
               }}
             />
           )}
