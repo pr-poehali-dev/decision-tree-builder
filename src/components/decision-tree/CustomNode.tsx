@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -9,9 +9,59 @@ import Icon from '@/components/ui/icon';
 import { cn } from '@/lib/utils';
 import { DecisionNode } from '@/types/decision-tree';
 
-export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => {
+interface CustomNodeProps extends NodeProps<DecisionNode> {
+  data: DecisionNode & {
+    onSelectionChange?: (nodeId: string, selectedOptions: string[]) => void;
+  };
+}
+
+export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
   const node = data;
-  
+  const [selectedRadio, setSelectedRadio] = useState<string | null>(null);
+  const [selectedCheckboxes, setSelectedCheckboxes] = useState<string[]>([]);
+
+  const handleRadioChange = useCallback((optionId: string) => {
+    setSelectedRadio(optionId);
+    if (node.onSelectionChange) {
+      node.onSelectionChange(node.id, [optionId]);
+    }
+  }, [node]);
+
+  const handleCheckboxChange = useCallback((optionId: string, checked: boolean) => {
+    const newSelection = checked
+      ? [...selectedCheckboxes, optionId]
+      : selectedCheckboxes.filter(id => id !== optionId);
+    setSelectedCheckboxes(newSelection);
+    if (node.onSelectionChange) {
+      node.onSelectionChange(node.id, newSelection);
+    }
+  }, [selectedCheckboxes, node]);
+
+  // Determine active handles based on selection
+  const getActiveHandles = (): Set<string> => {
+    const active = new Set<string>();
+
+    if (node.type === 'single' || node.type === 'recursive') {
+      if (selectedRadio) {
+        active.add(selectedRadio);
+      }
+    } else if (node.type === 'multi') {
+      // Check combo connections
+      node.comboConnections?.forEach((combo) => {
+        const allSelected = combo.optionIds.every(id => selectedCheckboxes.includes(id));
+        const exactMatch = combo.optionIds.length === selectedCheckboxes.length;
+        if (allSelected && exactMatch) {
+          active.add(combo.id);
+        }
+      });
+    }
+
+    return active;
+  };
+
+  const activeHandles = getActiveHandles();
+  const hasSelection = selectedRadio || selectedCheckboxes.length > 0;
+
   return (
     <>
       <Handle
@@ -55,13 +105,19 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
           {node.options && node.options.length > 0 && (
             <div className="space-y-3 mb-4">
               {(node.type === 'single' || node.type === 'recursive') ? (
-                <RadioGroup>
+                <RadioGroup value={selectedRadio || ''} onValueChange={handleRadioChange}>
                   {node.options.map((option) => {
                     const hasConnection = node.optionConnections?.some(
                       oc => oc.optionId === option.id
                     );
+                    const isActive = activeHandles.has(option.id);
+                    const isInactive = hasSelection && !isActive;
+
                     return (
-                      <div key={option.id} className="flex items-start gap-2 group relative py-1">
+                      <div key={option.id} className={cn(
+                        "flex items-start gap-2 group relative py-1 transition-opacity",
+                        isInactive && "opacity-40"
+                      )}>
                         <RadioGroupItem value={option.id} id={option.id} className="shrink-0 mt-0.5" />
                         <Label
                           htmlFor={option.id}
@@ -74,7 +130,7 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
                           position={Position.Right}
                           id={option.id}
                           style={{
-                            background: '#3b82f6',
+                            background: isActive ? '#3b82f6' : isInactive ? '#94a3b8' : '#3b82f6',
                             width: 10,
                             height: 10,
                             right: -22,
@@ -91,9 +147,15 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
               ) : (
                 <>
                   {node.options.map((option) => {
+                    const isChecked = selectedCheckboxes.includes(option.id);
                     return (
                       <div key={option.id} className="flex items-start gap-2 relative py-1">
-                        <Checkbox id={option.id} className="mt-0.5" />
+                        <Checkbox 
+                          id={option.id} 
+                          className="mt-0.5"
+                          checked={isChecked}
+                          onCheckedChange={(checked) => handleCheckboxChange(option.id, checked as boolean)}
+                        />
                         <Label
                           htmlFor={option.id}
                           className="text-sm font-normal leading-relaxed cursor-pointer flex-1 text-slate-700"
@@ -108,8 +170,14 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
                       .map(id => node.options.find(o => o.id === id)?.label)
                       .filter(Boolean)
                       .join(' + ');
+                    const isActive = activeHandles.has(combo.id);
+                    const isInactive = hasSelection && !isActive;
+
                     return (
-                      <div key={combo.id} className="relative">
+                      <div key={combo.id} className={cn(
+                        "relative transition-opacity",
+                        isInactive && "opacity-40"
+                      )}>
                         <div className="text-xs text-blue-600 font-medium mt-2 pt-2 border-t border-slate-200">
                           {optionLabels}
                         </div>
@@ -118,7 +186,7 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
                           position={Position.Right}
                           id={combo.id}
                           style={{
-                            background: '#8b5cf6',
+                            background: isActive ? '#8b5cf6' : isInactive ? '#94a3b8' : '#8b5cf6',
                             width: 10,
                             height: 10,
                             right: -22,

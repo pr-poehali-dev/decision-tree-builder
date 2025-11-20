@@ -64,12 +64,50 @@ export function DecisionTreeEditor({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [nodeSelections, setNodeSelections] = useState<Record<string, string[]>>({});
   const [newNode, setNewNode] = useState<Partial<DecisionNode>>({
     type: 'single',
     title: '',
     description: '',
     options: [],
   });
+
+  const handleSelectionChange = useCallback((nodeId: string, selectedOptions: string[]) => {
+    setNodeSelections(prev => ({
+      ...prev,
+      [nodeId]: selectedOptions
+    }));
+  }, []);
+
+  const getActiveEdges = useCallback(() => {
+    const active = new Set<string>();
+    
+    Object.entries(nodeSelections).forEach(([nodeId, selectedOptions]) => {
+      const node = nodes.find(n => n.id === nodeId);
+      if (!node) return;
+
+      if (node.data.type === 'single' || node.data.type === 'recursive') {
+        const selectedOption = selectedOptions[0];
+        if (selectedOption) {
+          const edge = edges.find(e => e.source === nodeId && e.sourceHandle === selectedOption);
+          if (edge) active.add(edge.id);
+        }
+      } else if (node.data.type === 'multi') {
+        node.data.comboConnections?.forEach(combo => {
+          const allSelected = combo.optionIds.every(id => selectedOptions.includes(id));
+          const exactMatch = combo.optionIds.length === selectedOptions.length;
+          if (allSelected && exactMatch) {
+            const edge = edges.find(e => e.source === nodeId && e.sourceHandle === combo.id);
+            if (edge) active.add(edge.id);
+          }
+        });
+      }
+    });
+
+    return active;
+  }, [nodeSelections, nodes, edges]);
+
+  const activeEdges = getActiveEdges();
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -435,7 +473,21 @@ export function DecisionTreeEditor({
     ? nodes.find((n) => n.id === selectedNodeId)?.data
     : null;
 
-  const decisionNodes = nodes.map((n) => n.data);
+  const styledEdges = edges.map(edge => {
+    const isActive = activeEdges.has(edge.id);
+    const hasAnySelection = Object.keys(nodeSelections).length > 0;
+    const isInactive = hasAnySelection && !isActive;
+
+    return {
+      ...edge,
+      animated: isActive || !hasAnySelection,
+      style: {
+        ...edge.style,
+        stroke: isInactive ? '#94a3b8' : edge.style?.stroke,
+        opacity: isInactive ? 0.3 : 1,
+      },
+    };
+  });
 
   return (
     <div className="flex h-screen bg-slate-50">
@@ -455,8 +507,14 @@ export function DecisionTreeEditor({
         <div className="flex-1 relative">
 
           <ReactFlow
-            nodes={nodes}
-            edges={edges}
+            nodes={nodes.map(n => ({
+              ...n,
+              data: {
+                ...n.data,
+                onSelectionChange: handleSelectionChange
+              }
+            }))}
+            edges={styledEdges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
@@ -502,7 +560,7 @@ export function DecisionTreeEditor({
       <NodeEditDialog
         isOpen={isEditDialogOpen}
         editingNode={editingNode}
-        nodes={decisionNodes}
+        nodes={nodes.map(n => n.data)}
         onClose={() => setIsEditDialogOpen(false)}
         onSave={handleSaveEdit}
         onUpdateNode={handleUpdateNode}
