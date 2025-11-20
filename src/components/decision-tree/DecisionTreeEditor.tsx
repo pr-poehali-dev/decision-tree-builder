@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -32,8 +32,35 @@ export function DecisionTreeEditor({
   initialNodes = [],
   initialEdges = [],
 }: DecisionTreeEditorProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  // Load from localStorage if available
+  const loadFromStorage = () => {
+    try {
+      const saved = localStorage.getItem('decision-tree-state');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { nodes: parsed.nodes || initialNodes, edges: parsed.edges || initialEdges };
+      }
+    } catch (e) {
+      console.error('Failed to load from localStorage', e);
+    }
+    return { nodes: initialNodes, edges: initialEdges };
+  };
+
+  const { nodes: savedNodes, edges: savedEdges } = loadFromStorage();
+  const [nodes, setNodes, onNodesChange] = useNodesState(savedNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(savedEdges);
+
+  // Auto-save to localStorage
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      try {
+        localStorage.setItem('decision-tree-state', JSON.stringify({ nodes, edges }));
+      } catch (e) {
+        console.error('Failed to save to localStorage', e);
+      }
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [nodes, edges]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
