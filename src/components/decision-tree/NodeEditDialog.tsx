@@ -124,6 +124,43 @@ export const NodeEditDialog = ({
             />
           </div>
 
+          {editingNode.type === 'recursive' && (
+            <div className="space-y-2 bg-green-50 p-3 rounded-lg border border-green-200">
+              <Label className="text-sm font-semibold text-green-800">Default Connection (Auto-continue)</Label>
+              <p className="text-xs text-green-700 mb-2">
+                This node will automatically continue to the selected node without user input
+              </p>
+              <Select
+                value={editingNode.defaultConnection || 'none'}
+                onValueChange={(value) => 
+                  onUpdateNode({ defaultConnection: value === 'none' ? undefined : value })
+                }
+              >
+                <SelectTrigger className="bg-white">
+                  <SelectValue placeholder="Select default target" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No default connection</SelectItem>
+                  {nodes
+                    .filter(n => n.id !== editingNode.id)
+                    .map(n => (
+                      <SelectItem key={n.id} value={n.id}>
+                        {n.title}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {editingNode.defaultConnection && (
+                <div className="flex items-center gap-2 text-xs text-green-700 mt-2">
+                  <Icon name="ArrowRight" size={14} />
+                  <span>
+                    Auto-continues to: {nodes.find(n => n.id === editingNode.defaultConnection)?.title}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Options</Label>

@@ -27,6 +27,7 @@ export interface DecisionNode {
   connections: string[];
   optionConnections: OptionConnection[];
   comboConnections?: ComboConnection[]; // Комбинации для multi типа
+  defaultConnection?: string; // Автоматический переход для recursive типа
   position: { x: number; y: number };
 }
 

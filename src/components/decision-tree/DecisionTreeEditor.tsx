@@ -82,6 +82,14 @@ export function DecisionTreeEditor({
   const getActiveEdges = useCallback(() => {
     const active = new Set<string>();
     
+    // Add all default connections (always active for recursive nodes)
+    nodes.forEach(node => {
+      if (node.data.type === 'recursive' && node.data.defaultConnection) {
+        const edge = edges.find(e => e.source === node.id && e.sourceHandle === 'default');
+        if (edge) active.add(edge.id);
+      }
+    });
+    
     Object.entries(nodeSelections).forEach(([nodeId, selectedOptions]) => {
       const node = nodes.find(n => n.id === nodeId);
       if (!node) return;
@@ -311,6 +319,30 @@ export function DecisionTreeEditor({
             },
           }));
           setEdges((eds) => [...eds, ...newEdges]);
+        }
+      }
+
+      // Sync edges when defaultConnection changes (for recursive type)
+      if (updates.defaultConnection !== undefined) {
+        // Remove old default edge
+        setEdges((eds) => eds.filter((e) => !(e.source === selectedNodeId && e.sourceHandle === 'default')));
+
+        // Add new default edge if set
+        if (updates.defaultConnection) {
+          const newEdge: Edge = {
+            id: `${selectedNodeId}-default-${updates.defaultConnection}`,
+            source: selectedNodeId,
+            sourceHandle: 'default',
+            target: updates.defaultConnection,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: '#10b981', strokeWidth: 2 },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: '#10b981',
+            },
+          };
+          setEdges((eds) => [...eds, newEdge]);
         }
       }
     },
