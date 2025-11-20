@@ -15,6 +15,9 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { CustomNode } from './CustomNode';
 import { TableOfContents } from './TableOfContents';
+import { DecisionTreeHeader } from './DecisionTreeHeader';
+import { AddNodeDialog } from './AddNodeDialog';
+import { NodeEditDialog } from './NodeEditDialog';
 import { DecisionNode } from '@/types/decision-tree';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
@@ -35,6 +38,15 @@ export function DecisionTreeEditor({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [showToc, setShowToc] = useState(true);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [newNode, setNewNode] = useState<Partial<DecisionNode>>({
+    type: 'single',
+    title: '',
+    description: '',
+    options: [],
+  });
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -57,77 +69,321 @@ export function DecisionTreeEditor({
     [setEdges]
   );
 
-  const handleNodeClick = useCallback((nodeId: string) => {
-    const node = nodes.find((n) => n.id === nodeId);
-    if (node) {
-      setNodes((nds) =>
-        nds.map((n) => ({
-          ...n,
-          selected: n.id === nodeId,
-        }))
+  const handleNodeClick = useCallback(
+    (nodeId: string) => {
+      const node = nodes.find((n) => n.id === nodeId);
+      if (node) {
+        setSelectedNodeId(nodeId);
+        setNodes((nds) =>
+          nds.map((n) => ({
+            ...n,
+            selected: n.id === nodeId,
+          }))
+        );
+      }
+    },
+    [nodes, setNodes]
+  );
+
+  const handleAddNode = useCallback(() => {
+    const id = `node-${Date.now()}`;
+    const node: Node<DecisionNode> = {
+      id,
+      type: 'custom',
+      position: { x: 100, y: 100 },
+      data: {
+        id,
+        type: newNode.type || 'single',
+        title: newNode.title || 'New Node',
+        description: newNode.description || '',
+        options: [],
+      },
+    };
+    setNodes((nds) => [...nds, node]);
+    setNewNode({ type: 'single', title: '', description: '', options: [] });
+    setIsAddDialogOpen(false);
+  }, [newNode, setNodes]);
+
+  const handleEditNode = useCallback(() => {
+    setIsEditDialogOpen(true);
+  }, []);
+
+  const handleDeleteNode = useCallback(() => {
+    if (selectedNodeId) {
+      setNodes((nds) => nds.filter((n) => n.id !== selectedNodeId));
+      setEdges((eds) =>
+        eds.filter((e) => e.source !== selectedNodeId && e.target !== selectedNodeId)
       );
+      setSelectedNodeId(null);
     }
-  }, [nodes, setNodes]);
+  }, [selectedNodeId, setNodes, setEdges]);
+
+  const handleSaveEdit = useCallback(() => {
+    setIsEditDialogOpen(false);
+  }, []);
+
+  const handleUpdateNode = useCallback(
+    (updates: Partial<DecisionNode>) => {
+      if (!selectedNodeId) return;
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === selectedNodeId ? { ...n, data: { ...n.data, ...updates } } : n
+        )
+      );
+    },
+    [selectedNodeId, setNodes]
+  );
+
+  const handleAddOption = useCallback(() => {
+    if (!selectedNodeId) return;
+    const optionId = `option-${Date.now()}`;
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id === selectedNodeId) {
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              options: [
+                ...(n.data.options || []),
+                { id: optionId, label: 'New Option' },
+              ],
+            },
+          };
+        }
+        return n;
+      })
+    );
+  }, [selectedNodeId, setNodes]);
+
+  const handleRemoveOption = useCallback(
+    (optionId: string) => {
+      if (!selectedNodeId) return;
+      setNodes((nds) =>
+        nds.map((n) => {
+          if (n.id === selectedNodeId) {
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                options: n.data.options.filter((opt) => opt.id !== optionId),
+                optionConnections: n.data.optionConnections?.filter(
+                  (oc) => oc.optionId !== optionId
+                ),
+              },
+            };
+          }
+          return n;
+        })
+      );
+      setEdges((eds) => eds.filter((e) => e.sourceHandle !== optionId));
+    },
+    [selectedNodeId, setNodes, setEdges]
+  );
+
+  const handleUpdateOption = useCallback(
+    (optionId: string, label: string) => {
+      if (!selectedNodeId) return;
+      setNodes((nds) =>
+        nds.map((n) => {
+          if (n.id === selectedNodeId) {
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                options: n.data.options.map((opt) =>
+                  opt.id === optionId ? { ...opt, label } : opt
+                ),
+              },
+            };
+          }
+          return n;
+        })
+      );
+    },
+    [selectedNodeId, setNodes]
+  );
+
+  const handleConnectOption = useCallback(
+    (nodeId: string, optionId: string, targetNodeId: string) => {
+      // Remove existing connection for this option
+      setEdges((eds) =>
+        eds.filter((e) => !(e.source === nodeId && e.sourceHandle === optionId))
+      );
+
+      // Add new edge
+      const newEdge: Edge = {
+        id: `${nodeId}-${optionId}-${targetNodeId}`,
+        source: nodeId,
+        sourceHandle: optionId,
+        target: targetNodeId,
+        type: 'smoothstep',
+        animated: true,
+        style: { stroke: '#3b82f6', strokeWidth: 2 },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: '#3b82f6',
+        },
+      };
+      setEdges((eds) => [...eds, newEdge]);
+
+      // Update node optionConnections
+      setNodes((nds) =>
+        nds.map((n) => {
+          if (n.id === nodeId) {
+            const connections = n.data.optionConnections || [];
+            const existingIndex = connections.findIndex((oc) => oc.optionId === optionId);
+            const newConnections =
+              existingIndex >= 0
+                ? connections.map((oc) =>
+                    oc.optionId === optionId ? { ...oc, targetNodeId } : oc
+                  )
+                : [...connections, { optionId, targetNodeId }];
+            return {
+              ...n,
+              data: { ...n.data, optionConnections: newConnections },
+            };
+          }
+          return n;
+        })
+      );
+    },
+    [setEdges, setNodes]
+  );
+
+  const handleRemoveOptionConnection = useCallback(
+    (nodeId: string, optionId: string) => {
+      setEdges((eds) =>
+        eds.filter((e) => !(e.source === nodeId && e.sourceHandle === optionId))
+      );
+      setNodes((nds) =>
+        nds.map((n) => {
+          if (n.id === nodeId) {
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                optionConnections: n.data.optionConnections?.filter(
+                  (oc) => oc.optionId !== optionId
+                ),
+              },
+            };
+          }
+          return n;
+        })
+      );
+    },
+    [setEdges, setNodes]
+  );
+
+  const getTargetNodeForOption = useCallback(
+    (nodeId: string, optionId: string): string | null => {
+      const edge = edges.find(
+        (e) => e.source === nodeId && e.sourceHandle === optionId
+      );
+      return edge?.target || null;
+    },
+    [edges]
+  );
+
+  const editingNode = selectedNodeId
+    ? nodes.find((n) => n.id === selectedNodeId)?.data
+    : null;
+
+  const decisionNodes = nodes.map((n) => n.data);
 
   return (
     <div className="flex h-screen bg-slate-50">
       {showToc && (
         <TableOfContents
-          nodes={nodes.map((n) => n.data)}
+          nodes={decisionNodes}
           onNodeClick={handleNodeClick}
           onClose={() => setShowToc(false)}
         />
       )}
 
-      <div className="flex-1 relative">
-        <div className="absolute top-4 left-4 z-10 flex gap-2">
-          {!showToc && (
-            <Button
-              onClick={() => setShowToc(true)}
-              variant="secondary"
-              size="sm"
-              className="bg-white shadow-md"
-            >
-              <Icon name="Menu" size={16} className="mr-2" />
-              Table of Contents
-            </Button>
-          )}
-        </div>
+      <div className="flex-1 flex flex-col">
+        <DecisionTreeHeader
+          selectedNodeId={selectedNodeId}
+          onAddNode={() => setIsAddDialogOpen(true)}
+          onEditNode={handleEditNode}
+          onDeleteNode={handleDeleteNode}
+        />
 
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          nodeTypes={nodeTypes}
-          connectionMode={ConnectionMode.Loose}
-          fitView
-          className="bg-slate-50"
-          defaultEdgeOptions={{
-            type: 'smoothstep',
-            animated: true,
-            style: { stroke: '#3b82f6', strokeWidth: 2 },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              color: '#3b82f6',
-            },
-          }}
-        >
-          <Background color="#94a3b8" gap={16} />
-          <Controls />
-          <MiniMap
-            nodeColor={(node) => {
-              if (node.data.type === 'single') return '#3b82f6';
-              if (node.data.type === 'multi') return '#8b5cf6';
-              if (node.data.type === 'end') return '#10b981';
-              if (node.data.type === 'recursive') return '#f97316';
-              return '#64748b';
+        <div className="flex-1 relative">
+          <div className="absolute top-4 left-4 z-10 flex gap-2">
+            {!showToc && (
+              <Button
+                onClick={() => setShowToc(true)}
+                variant="secondary"
+                size="sm"
+                className="bg-white shadow-md"
+              >
+                <Icon name="Menu" size={16} className="mr-2" />
+                Table of Contents
+              </Button>
+            )}
+          </div>
+
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            nodeTypes={nodeTypes}
+            connectionMode={ConnectionMode.Loose}
+            fitView
+            className="bg-slate-50"
+            defaultEdgeOptions={{
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: '#3b82f6', strokeWidth: 2 },
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+                color: '#3b82f6',
+              },
             }}
-            className="bg-white border border-slate-200 rounded-lg"
-          />
-        </ReactFlow>
+            onNodeClick={(_, node) => handleNodeClick(node.id)}
+          >
+            <Background color="#94a3b8" gap={16} />
+            <Controls />
+            <MiniMap
+              nodeColor={(node) => {
+                if (node.data.type === 'single') return '#3b82f6';
+                if (node.data.type === 'multi') return '#8b5cf6';
+                if (node.data.type === 'end') return '#10b981';
+                if (node.data.type === 'recursive') return '#f97316';
+                return '#64748b';
+              }}
+              className="bg-white border border-slate-200 rounded-lg"
+            />
+          </ReactFlow>
+        </div>
       </div>
+
+      <AddNodeDialog
+        isOpen={isAddDialogOpen}
+        newNode={newNode}
+        onClose={() => setIsAddDialogOpen(false)}
+        onAdd={handleAddNode}
+        onUpdateNewNode={(updates) => setNewNode({ ...newNode, ...updates })}
+      />
+
+      <NodeEditDialog
+        isOpen={isEditDialogOpen}
+        editingNode={editingNode}
+        nodes={decisionNodes}
+        onClose={() => setIsEditDialogOpen(false)}
+        onSave={handleSaveEdit}
+        onUpdateNode={handleUpdateNode}
+        onAddOption={handleAddOption}
+        onRemoveOption={handleRemoveOption}
+        onUpdateOption={handleUpdateOption}
+        onConnectOption={handleConnectOption}
+        onRemoveOptionConnection={handleRemoveOptionConnection}
+        getTargetNodeForOption={getTargetNodeForOption}
+      />
     </div>
   );
 }
