@@ -322,29 +322,8 @@ export function DecisionTreeEditor({
         }
       }
 
-      // Sync edges when defaultConnection changes (for recursive type)
-      if (updates.defaultConnection !== undefined) {
-        // Remove old default edge
-        setEdges((eds) => eds.filter((e) => !(e.source === selectedNodeId && e.sourceHandle === 'default')));
-
-        // Add new default edge if set
-        if (updates.defaultConnection) {
-          const newEdge: Edge = {
-            id: `${selectedNodeId}-default-${updates.defaultConnection}`,
-            source: selectedNodeId,
-            sourceHandle: 'default',
-            target: updates.defaultConnection,
-            type: 'smoothstep',
-            animated: true,
-            style: { stroke: '#10b981', strokeWidth: 2 },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              color: '#10b981',
-            },
-          };
-          setEdges((eds) => [...eds, newEdge]);
-        }
-      }
+      // Note: defaultConnection edges are managed through manual connections only
+      // We don't auto-create edges to avoid duplicates
     },
     [selectedNodeId, setNodes, nodes, setEdges]
   );
