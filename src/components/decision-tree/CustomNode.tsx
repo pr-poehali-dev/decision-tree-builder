@@ -112,24 +112,18 @@ export const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
           )}
 
           {node.type === 'recursive' && node.defaultConnection && (
-            <div className="mb-4 pb-4 border-b border-slate-200">
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <Icon name="ArrowRight" size={16} />
-                <span>Auto-continues to next step</span>
-              </div>
-              <Handle
-                type="source"
-                position={Position.Right}
-                id="default"
-                style={{
-                  background: '#10b981',
-                  width: 10,
-                  height: 10,
-                  right: -22,
-                  top: '50%',
-                }}
-              />
-            </div>
+            <Handle
+              type="source"
+              position={Position.Right}
+              id="default"
+              style={{
+                background: '#10b981',
+                width: 10,
+                height: 10,
+                right: -22,
+                top: '50%',
+              }}
+            />
           )}
 
           {node.options && node.options.length > 0 && (
