@@ -89,39 +89,46 @@ export const CustomNode = memo(({ data, selected }: NodeProps<DecisionNode>) => 
                   })}
                 </RadioGroup>
               ) : (
-                node.options.map((option) => {
-                  const hasConnection = node.optionConnections?.some(
-                    oc => oc.optionId === option.id
-                  );
-                  return (
-                    <div key={option.id} className="flex items-start gap-2 relative py-1">
-                      <Checkbox id={option.id} className="mt-0.5" />
-                      <Label
-                        htmlFor={option.id}
-                        className="text-sm font-normal leading-relaxed cursor-pointer flex-1 text-slate-700"
-                      >
-                        {option.label}
-                      </Label>
-                      {hasConnection && (
+                <>
+                  {node.options.map((option) => {
+                    return (
+                      <div key={option.id} className="flex items-start gap-2 relative py-1">
+                        <Checkbox id={option.id} className="mt-0.5" />
+                        <Label
+                          htmlFor={option.id}
+                          className="text-sm font-normal leading-relaxed cursor-pointer flex-1 text-slate-700"
+                        >
+                          {option.label}
+                        </Label>
+                      </div>
+                    );
+                  })}
+                  {node.comboConnections?.map((combo, index) => {
+                    const optionLabels = combo.optionIds
+                      .map(id => node.options.find(o => o.id === id)?.label)
+                      .filter(Boolean)
+                      .join(' + ');
+                    return (
+                      <div key={combo.id} className="relative">
+                        <div className="text-xs text-blue-600 font-medium mt-2 pt-2 border-t border-slate-200">
+                          {optionLabels}
+                        </div>
                         <Handle
                           type="source"
                           position={Position.Right}
-                          id={option.id}
+                          id={combo.id}
                           style={{
-                            background: '#3b82f6',
+                            background: '#8b5cf6',
                             width: 10,
                             height: 10,
                             right: -22,
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            opacity: hasConnection ? 1 : 0,
-                            pointerEvents: hasConnection ? 'auto' : 'none'
+                            top: `${50 + index * 20}%`,
                           }}
                         />
-                      )}
-                    </div>
-                  );
-                })
+                      </div>
+                    );
+                  })}
+                </>
               )}
             </div>
           )}

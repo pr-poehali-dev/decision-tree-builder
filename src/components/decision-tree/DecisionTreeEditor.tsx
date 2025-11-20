@@ -73,23 +73,31 @@ export function DecisionTreeEditor({
 
   const onConnect = useCallback(
     (params: Connection) => {
+      const sourceNode = nodes.find((n) => n.id === params.source);
+      const isComboHandle = sourceNode?.data.comboConnections?.some(
+        (c) => c.id === params.sourceHandle
+      );
+
       setEdges((eds) =>
         addEdge(
           {
             ...params,
             type: 'smoothstep',
             animated: true,
-            style: { stroke: '#3b82f6', strokeWidth: 2 },
+            style: { 
+              stroke: isComboHandle ? '#8b5cf6' : '#3b82f6', 
+              strokeWidth: 2 
+            },
             markerEnd: {
               type: MarkerType.ArrowClosed,
-              color: '#3b82f6',
+              color: isComboHandle ? '#8b5cf6' : '#3b82f6',
             },
           },
           eds
         )
       );
     },
-    [setEdges]
+    [setEdges, nodes]
   );
 
   const handleNodeClick = useCallback(
@@ -218,6 +226,7 @@ export function DecisionTreeEditor({
       setNodes([]);
       setEdges([]);
       setSelectedNodeId(null);
+      localStorage.removeItem('decision-tree-state');
     }
   }, [setNodes, setEdges]);
 
@@ -233,8 +242,41 @@ export function DecisionTreeEditor({
           n.id === selectedNodeId ? { ...n, data: { ...n.data, ...updates } } : n
         )
       );
+
+      // Sync edges when comboConnections change
+      if (updates.comboConnections) {
+        const node = nodes.find((n) => n.id === selectedNodeId);
+        if (node) {
+          // Remove old combo edges
+          setEdges((eds) =>
+            eds.filter(
+              (e) =>
+                !(
+                  e.source === selectedNodeId &&
+                  node.data.comboConnections?.some((c) => c.id === e.sourceHandle)
+                )
+            )
+          );
+
+          // Add new combo edges
+          const newEdges = updates.comboConnections.map((combo) => ({
+            id: `${selectedNodeId}-${combo.id}-${combo.targetNodeId}`,
+            source: selectedNodeId,
+            sourceHandle: combo.id,
+            target: combo.targetNodeId,
+            type: 'smoothstep' as const,
+            animated: true,
+            style: { stroke: '#8b5cf6', strokeWidth: 2 },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: '#8b5cf6',
+            },
+          }));
+          setEdges((eds) => [...eds, ...newEdges]);
+        }
+      }
     },
-    [selectedNodeId, setNodes]
+    [selectedNodeId, setNodes, nodes, setEdges]
   );
 
   const handleAddOption = useCallback(() => {

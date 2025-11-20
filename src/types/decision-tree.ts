@@ -11,6 +11,13 @@ export interface OptionConnection {
   targetNodeId: string;
 }
 
+export interface ComboConnection {
+  id: string;
+  optionIds: string[]; // Комбинация выбранных опций
+  targetNodeId: string;
+  label?: string; // Описание комбинации
+}
+
 export interface DecisionNode {
   id: string;
   type: NodeType;
@@ -19,6 +26,7 @@ export interface DecisionNode {
   options: NodeOption[];
   connections: string[];
   optionConnections: OptionConnection[];
+  comboConnections?: ComboConnection[]; // Комбинации для multi типа
   position: { x: number; y: number };
 }
 
